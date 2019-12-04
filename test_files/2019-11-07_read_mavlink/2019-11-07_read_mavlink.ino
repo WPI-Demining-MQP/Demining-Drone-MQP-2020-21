@@ -24,8 +24,6 @@ void setup() {
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_ID, 0, MAV_CMD_COMPONENT_ARM_DISARM, 0, 0,0,0,0,0,0,0); // DISARM
   len = mavlink_msg_to_send_buffer(buf, &msg);
   Serial1.write(buf,len);
-  while(1) { check_msg(); }
-}
 
 void loop() {
   check_msg();
