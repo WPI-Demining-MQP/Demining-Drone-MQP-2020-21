@@ -28,8 +28,37 @@ void setup() {
 
 void loop() {
   // STATE MACHINE WILL GO HERE
+  // TODO: state machine
 
-  // At the end of each loop, check for incoming messages
+  // At the end of each loop:
+  // Check for incoming messages from the base station
+  // TODO: [Insert function call here]
+  
+  // Check for incoming messages from the Pixhawk
+  mavlink_message_t msg_in;
+  mavlink_status_t stat_in;
+  receive_mavlink(&msg_in, &stat_in);
+}
+
+// Reads from MAV_PORT until either:
+//   1) the serial buffer is empty, or
+//   2) a full message is found
+// If (1), then the function returns 0. If any bytes remain, they will be stored statically
+// If (2), then the function returns 1 and copies the message and status into the locations specified by the pointers
+int receive_mavlink(mavlink_message_t *msg_ptr, mavlink_status_t *stat_ptr) {
+  char byte_in;
+  mavlink_message_t msg;
+  mavlink_status_t stat;
+  
+  while(MAV_PORT.available()) {   // As long as there's serial data, read it
+    byte_in = MAV_PORT.read();
+    if(mavlink_parse_char(0, byte_in, &msg, &stat)) {   // If that byte completed the message, then handle it
+      *msg_ptr = msg;   // Copy the received message into the location specified by msg_pointer
+      *stat_ptr = stat; // Same with the status
+      return 1;
+    }
+  }
+  return 0;   // If we made it this far, then we didn't get a message this time
 }
 
 // Given a message, serializes it and sends it over MAV_PORT
@@ -42,14 +71,17 @@ void send_mavlink(mavlink_message_t msg) {
 // Arms the drone
 void arm_drone() {
   mavlink_message_t msg;
-  // Pack a MAV_CMD_COMPONENT_ARM_DISARM message with the arm parameter set,
+  // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter set,
   // into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_COMPONENT_ARM_DISARM, 0, 1,0,0,0,0,0,0); // ARM
   send_mavlink(msg);
 }
 
+// Disarm the drone
 void disarm_drone() {
   mavlink_message_t msg;
+  // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter cleared,
+  // into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_COMPONENT_ARM_DISARM, 0, 0,0,0,0,0,0,0); // DISARM
   send_mavlink(msg);
 }
