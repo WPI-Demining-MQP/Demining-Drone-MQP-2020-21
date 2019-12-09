@@ -37,7 +37,7 @@ enum command_status_t {ACCEPTED, IN_PROGRESS, COMPLETED} command_status;
 
 // State machine states
 // I'm sure we'll need to add more of these
-enum state_t {DISARMED, ARMED, TAKEOFF, HOVER, APPROACH, READY_TO_DROP, ESCAPE} state;
+enum state_t {DISARMED, ARMED, TAKEOFF, HOVER, APPROACH, READY_TO_DROP, ESCAPE, ABORT} state;
 
 // Mine datatype
 struct mine_t {
@@ -54,9 +54,16 @@ void setup() {
   DEBUG_PORT.begin(DEBUG_BAUD);
   MAV_PORT.begin(MAV_BAUD);
 
+  // Determine fixed dGPS location before takeoff
+  // Wait for confirmation message about fixed dGPS location before proceeding
+  
   // Read ordered minefield data (flight path) from base station, into minefield array
   // TODO: ^
   // Program should not pass this point until it has minefield data
+  // while (minefield data not present){
+  //    wait for minefield data and keep checking for it
+  //    if (minefield data found) {call drone startup protocol and set state to armed when that's done} }
+  
 }
 
 void loop() {
@@ -90,6 +97,10 @@ void loop() {
 
       break;
     case ESCAPE:        // Drone just dropped a payload, should now be running away
+    // TODO: After each drop, check to see how many payloads are left. If there are none, return to base
+
+      break;
+    case ABORT:         // User clicks the abort button and the drone needs to return to base
 
       break;
   }
