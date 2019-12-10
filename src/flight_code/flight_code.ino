@@ -66,7 +66,7 @@ void loop() {
       // If we get the go signal from the base station:
       //   arm();
       //   state = ARMED;
-      // Not 100% sure it's possible to arm without controller input - needs more testing
+      // Not 100% sure it's possible to arm like this - needs more testing
       break;
     case ARMED:         // Armed, ready to takeoff
       // Just chilling? Might not need this one
@@ -154,6 +154,8 @@ void set_globals(mavlink_message_t *msg, mavlink_status_t *stat) {
     command_status = IN_PROGRESS;
   }
 }
+
+// TODO: Handle comfirmation field in arm, disarm, and takeoff functions
 
 // Arms the drone
 void arm() {
