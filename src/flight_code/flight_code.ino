@@ -37,7 +37,7 @@ enum command_status_t {ACCEPTED, IN_PROGRESS, COMPLETED} command_status;
 
 // State machine states
 // I'm sure we'll need to add more of these
-enum state_t {DISARMED, ARMED, TAKEOFF, HOVER, APPROACH, READY_TO_DROP, ESCAPE, ABORT} state;
+enum state_t {DISARMED, ARMED, TAKEOFF, LAND, APPROACH, READY_TO_DROP, DROP, ESCAPE, ABORT, RETURN_HOME} state;
 
 // Mine datatype
 struct mine_t {
@@ -63,7 +63,7 @@ void setup() {
   // while (minefield data not present){
   //    wait for minefield data and keep checking for it
   //    if (minefield data found) {call drone startup protocol and set state to armed when that's done} }
-  
+  // prep the minefield path
 }
 
 void loop() {
@@ -87,13 +87,16 @@ void loop() {
         // TODO: [update state here]
       }
       break;
-    case HOVER:         // In the air, hovering idly
-
+    case LAND:          // Actively landing
+    
       break;
     case APPROACH:      // Approaching a mine
 
       break;
     case READY_TO_DROP: // Drone is over the mine, time to drop
+
+      break;
+    case DROP:          //dropping the payload
 
       break;
     case ESCAPE:        // Drone just dropped a payload, should now be running away
@@ -102,6 +105,8 @@ void loop() {
       break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
 
+      break;
+    case RETURN_HOME:   // Drone returns back to base
       break;
   }
   
