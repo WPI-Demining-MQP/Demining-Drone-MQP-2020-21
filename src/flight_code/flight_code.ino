@@ -46,9 +46,16 @@ struct mine_t {
   bool isDetonated;
 };
 
+// Node datatype
+struct node_t {
+  mine_t mine;
+  struct node_t *node;
+};
+
 uint8_t num_mines;              // The total number of mines in the minefield
 uint8_t minefield_index = 0;    // Current position in the minefield array
 mine_t minesfield[MAX_MINES];   // Array of mines that makes up the minefield
+bool minefield_present = 0; 
 
 void setup() {
   DEBUG_PORT.begin(DEBUG_BAUD);
@@ -60,10 +67,12 @@ void setup() {
   // Read ordered minefield data (flight path) from base station, into minefield array
   // TODO: ^
   // Program should not pass this point until it has minefield data
-  // while (minefield data not present){
-  //    wait for minefield data and keep checking for it
-  //    if (minefield data found) {call drone startup protocol and set state to armed when that's done} }
+  while(!minefield_present){
+      //check for presence of the minefield data    
+    }
+    
   // prep the minefield path
+  minefield_to_array();
 }
 
 void loop() {
@@ -107,6 +116,8 @@ void loop() {
 
       break;
     case RETURN_HOME:   // Drone returns back to base
+    // probably will land after this command happens :) 
+    
       break;
   }
   
@@ -201,3 +212,7 @@ void takeoff() {
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_NAV_TAKEOFF, 0, 0,0,0,0,0,0,OPERATING_ALT); // TAKEOFF
   send_mavlink(msg);
 }
+
+// Takes in the random minefield data and makes it a 2D array 
+void minefield_to_array(){
+  }
