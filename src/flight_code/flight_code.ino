@@ -27,6 +27,9 @@
 #define OPERATING_ALT 20  // The altitude at which the drone will move from point to point
 #define DROP_ALT      20  // The altitude at which the drone will drop payloads
 
+// Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
+int32_t home_lat = 422756340, home_lon = -718030810;
+
 // Command status variable
 // Each time we send a command to the Pixhawk, we need to wait for the appropriate response from the Pixhawk
 // These variables track the response so we can reference it in the state machine
@@ -36,8 +39,6 @@ enum command_status_t {ACCEPTED, IN_PROGRESS, COMPLETED} command_status;
 // I'm sure we'll need to add more of these
 enum state_t {DISARMED, ARMED, TAKEOFF, LAND, APPROACH, READY_TO_DROP, DROP, ESCAPE, ABORT, RETURN_HOME} state;
 
-uint8_t num_mines;              // The total number of mines in the minefield
-bool minefield_present = 0; 
 
 void setup() {
   DEBUG_PORT.begin(DEBUG_BAUD);
@@ -46,15 +47,20 @@ void setup() {
   // Determine fixed dGPS location before takeoff
   // Wait for confirmation message about fixed dGPS location before proceeding
   
-  // Read ordered minefield data (flight path) from base station, into minefield array
+  // Read minefield data (unordered list of mines) from base station, into linked list
   // TODO: ^
-  // Program should not pass this point until it has minefield data
-  while(!minefield_present){
-      //check for presence of the minefield data    
-    }
-    
-  // prep the minefield path
-  minefield_to_array();
+  // head of the linked list that stores the incoming mine data
+  node_t* head = NULL;
+  // gather incoming minefield data and place it into a linked list
+  // This call will be blocking as data is received
+  get_minefield_data(&head);
+  
+  // Plan the drone's path through the minefield
+  plan_path(home_lat, home_lon, &head);
+  // At this point, all mines are stored in a global 2D array (n x 6) called "mines".
+  // The current position in this array is storred in a global index called "mines_index"
+  // The current mine can be accessed as mines[mines_index / 6][mines_index % 6]
+  // When mines_index % 6 == 5 (or zero, depends on how we implement it) it's time to return to the base station to get more sandbags
 }
 
 void loop() {
@@ -195,6 +201,15 @@ void takeoff() {
   send_mavlink(msg);
 }
 
-// Takes in the random minefield data and makes it a 2D array 
-void minefield_to_array(){
-  }
+// Reads incoming minefield data from the base station and stored it in the linked list pointed to by head_ref
+// Note: this call is blocking - it will not return until all of the minefield data has been received
+void get_minefield_data(node_t** head_ref) {
+//  while(we've got mines) {
+    // read some minefield data...
+    struct mine_t* new_mine = (struct mine_t*)malloc(MINE_T_SIZE);  // allocate some memory for the new mine data
+    new_mine->lat = NULL; // TODO: Put a latitude here
+    new_mine->lon = NULL; // TODO: Put a longitude here
+    new_mine->isDetonated = false;  // assume the mine is live
+    LL_add(head_ref, new_mine);  // Add the new mine to the linked list
+//  }
+}

@@ -2,9 +2,10 @@
 
 // Structured mine array
 mine_t mines[(MAX_NUM_MINES / MINES_PER_RUN) + 1][MINES_PER_RUN];
+uint32_t mines_index = 0;
 
 void LL_add(node_t** head_ref, mine_t* mine_ptr) {
-    struct node_t* new_node = (struct node_t*)malloc(sizeof(node_t));
+    struct node_t* new_node = (struct node_t*)malloc(NODE_T_SIZE);
     new_node->mine = mine_ptr;
     new_node->next = NULL;
     if (*head_ref == NULL) {

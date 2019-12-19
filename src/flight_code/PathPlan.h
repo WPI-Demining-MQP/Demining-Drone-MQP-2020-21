@@ -17,15 +17,18 @@ struct mine_t {
     int32_t lon;
     bool isDetonated;
 };
+#define MINE_T_SIZE sizeof(mine_t)
 
 // Node datatype for linked list
 struct node_t {
     mine_t* mine;
     struct node_t* next;
 };
+#define NODE_T_SIZE sizeof(node_t)
 
 // Structured mine array
 extern mine_t mines[(MAX_NUM_MINES / MINES_PER_RUN) + 1][MINES_PER_RUN];
+extern uint32_t mines_index;
 
 void LL_add(node_t**, mine_t*);
 void LL_remove(node_t**, mine_t*);
