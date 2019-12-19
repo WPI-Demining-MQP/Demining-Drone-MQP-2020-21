@@ -6,6 +6,7 @@
  */
 
 #include "mavlink.h"
+#include "PathPlan.h"
 
 // Constants for sending messages
 // Only sending to the Pixhawk, so these won't change
@@ -21,10 +22,6 @@
 #define DEBUG_BAUD 115200
 #define MAV_BAUD   19200
 
-// System limitations
-#define MAX_MINES 128   // Max number of mines in minefield
-#define MINES_PER_RUN 6 // Max number of payloads that can be carried
-
 // Flight characteristics
 // Altitudes are relative to the takeoff point (home position)
 #define OPERATING_ALT 20  // The altitude at which the drone will move from point to point
@@ -39,22 +36,7 @@ enum command_status_t {ACCEPTED, IN_PROGRESS, COMPLETED} command_status;
 // I'm sure we'll need to add more of these
 enum state_t {DISARMED, ARMED, TAKEOFF, LAND, APPROACH, READY_TO_DROP, DROP, ESCAPE, ABORT, RETURN_HOME} state;
 
-// Mine datatype
-struct mine_t {
-  int32_t lat;
-  int32_t lon;
-  bool isDetonated;
-};
-
-// Node datatype
-struct node_t {
-  mine_t mine;
-  struct node_t *node;
-};
-
 uint8_t num_mines;              // The total number of mines in the minefield
-uint8_t minefield_index = 0;    // Current position in the minefield array
-mine_t minesfield[MAX_MINES];   // Array of mines that makes up the minefield
 bool minefield_present = 0; 
 
 void setup() {
