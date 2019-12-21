@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <math.h>
 
-#define PI 3.14159265358979311599796346854
+//#define PI 3.14159265358979311599796346854
 #define EARTH_RADIUS 6371000.0 // 6371 km
 #define MINES_PER_RUN 6
 #define MAX_NUM_MINES 256
