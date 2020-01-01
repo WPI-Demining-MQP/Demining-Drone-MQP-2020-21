@@ -20,7 +20,7 @@ int32_t home_lat = 422756340, home_lon = -718030810;
 
 // State machine states
 // I'm sure we'll need to add more of these
-enum state_t {DISARMED, ARMED, TAKEOFF, LAND, APPROACH, READY_TO_DROP, DROP, ESCAPE, ABORT, RETURN_HOME} state;
+enum state_t {DISARMED, TAKEOFF, APPROACH, DROP, ESCAPE, RETURN_HOME, DONE, ABORT} state;
 
 
 void setup() {
@@ -54,11 +54,8 @@ void loop() {
     case DISARMED:      // Disarmed, sitting on the ground
       // If we get the go signal from the base station:
       //   arm();
-      //   state = ARMED;
+      //   state = TAKEOFF;
       // Not 100% sure it's possible to arm like this - needs more testing
-      break;
-    case ARMED:         // Armed, ready to takeoff
-      // Just chilling? Might not need this one
       break;
     case TAKEOFF:       // Actively taking off
       takeoff();
@@ -69,28 +66,23 @@ void loop() {
         // TODO: [update state here]
       }
       break;
-    case LAND:          // Actively landing
-    
-      break;
     case APPROACH:      // Approaching a mine
-
-      break;
-    case READY_TO_DROP: // Drone is over the mine, time to drop
-
+      // TODO
       break;
     case DROP:          //dropping the payload
-
+      // TODO
       break;
     case ESCAPE:        // Drone just dropped a payload, should now be running away
-    // TODO: After each drop, check to see how many payloads are left. If there are none, return to base
-
-      break;
-    case ABORT:         // User clicks the abort button and the drone needs to return to base
-
+      // TODO: After each drop, check to see how many payloads are left. If there are none, return to base
       break;
     case RETURN_HOME:   // Drone returns back to base
-    // probably will land after this command happens :) 
-    
+      // TODO: RTL
+      break;
+    case ABORT:         // User clicks the abort button and the drone needs to return to base
+      // TODO
+      break;
+    case DONE:          // Mission completed, state will remain here
+      // TODO: Maybe send a done message to the base station
       break;
   }
   
@@ -103,15 +95,20 @@ void loop() {
   if(receive_mavlink(&msg_in, &stat_in)) {
     switch(msg_in.msgid) {
       case MAVLINK_MSG_ID_COMMAND_ACK:
-        set_globals(&msg_in, &stat_in);
+        set_command_status(&msg_in, &stat_in);
         break;
     }
   }
+
+  // Ensure that the last Mavlink message sent to the Pixhawk was acknowledged within the timeout
+  // If not, the command will be resent
+  check_timeouts();
 }
 
 // Reads incoming minefield data from the base station and stored it in the linked list pointed to by head_ref
 // Note: this call is blocking - it will not return until all of the minefield data has been received
 void get_minefield_data(node_t** head_ref) {
+  // TODO
 //  while(we've got mines) {
     // read some minefield data...
     struct mine_t* new_mine = (struct mine_t*)malloc(MINE_T_SIZE);  // allocate some memory for the new mine data
