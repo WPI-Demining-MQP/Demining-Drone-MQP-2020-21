@@ -67,8 +67,8 @@ void loop() {
       }
       break;
     case BEGIN_APPROACH:      // Approaching a mine
-      mine_t* cur_mine = &mines[mines_index_row][mines_index_col];  // pointer to the current mine in mines[][]
-      set_position_target(cur_mine->lat, cur_mine->lon);            // Send a message to the Pixhawk telling it to move the drone
+      mine_t* cur_mine = &mines[mines_index / MINES_PER_RUN][mines_index % MINES_PER_RUN];  // pointer to the current mine in mines[][]
+      set_position_target(cur_mine->lat, cur_mine->lon);                                    // Send a message to the Pixhawk telling it to move the drone
       state = APPROACHING;
       break;
     case APPROACHING:
@@ -77,18 +77,12 @@ void loop() {
       break;
     case DROP:          //dropping the payload
       // TODO: trigger payload drop
-      if(mines_index_col == MINES_PER_RUN-1) {
-        mines_index_col = 0;
-        mines_index_row++;
-      }
-      else {
-        mines_index_col++;
-      }
+      mines_index++;
       state = BEGIN_ESCAPE;
       break;
     case BEGIN_ESCAPE:  // Drone just dropped a payload, should now be running away
       // TODO: After each drop, check to see how many payloads are left. If there are none, return to base
-      if(mines_index_col == 0 || row_col_to_linear(mines_index_row,mines_index_col) >= num_mines) {
+      if(mines_index % MINES_PER_RUN == 0 || mines_index >= num_mines) {
         state = RETURN_HOME;
       }
       else {

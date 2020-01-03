@@ -28,8 +28,7 @@ struct node_t {
 
 // Structured mine array
 extern mine_t mines[(MAX_NUM_MINES / MINES_PER_RUN) + 1][MINES_PER_RUN];
-extern uint32_t mines_index_row;
-extern uint32_t mines_index_col;
+extern uint16_t mines_index;
 extern uint16_t num_mines;
 
 void LL_add(node_t**, mine_t*);

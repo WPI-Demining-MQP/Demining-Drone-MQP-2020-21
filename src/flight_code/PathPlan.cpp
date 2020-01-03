@@ -2,8 +2,7 @@
 
 // Structured mine array
 mine_t mines[(MAX_NUM_MINES / MINES_PER_RUN) + 1][MINES_PER_RUN];
-uint8_t mines_index_row = 0;
-uint8_t mines_index_col = 0;
+uint16_t mines_index = 0;
 uint16_t num_mines = 0;
 
 void LL_add(node_t** head_ref, mine_t* mine_ptr) {
