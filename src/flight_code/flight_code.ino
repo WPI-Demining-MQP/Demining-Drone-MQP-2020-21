@@ -20,7 +20,7 @@ int32_t home_lat = 422756340, home_lon = -718030810;
 
 // State machine states
 // I'm sure we'll need to add more of these
-enum state_t {DISARMED, TAKEOFF, APPROACH, DROP, ESCAPE, RETURN_HOME, DONE, ABORT} state;
+enum state_t {DISARMED, TAKEOFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, RETURN_HOME, DONE, ABORT} state;
 
 
 void setup() {
@@ -61,19 +61,44 @@ void loop() {
       takeoff();
       // listen for ACK response, and wait until complete
       if(command_status == ACCEPTED) {
+        // takeoff complete, move on to mine approach
         command_status = COMPLETED; // Mark it as taken care of
-        // takeoff complete, now we can move on.
-        // TODO: [update state here]
+        state = BEGIN_APPROACH;
       }
       break;
-    case APPROACH:      // Approaching a mine
-      // TODO
+    case BEGIN_APPROACH:      // Approaching a mine
+      mine_t* cur_mine = &mines[mines_index_row][mines_index_col];  // pointer to the current mine in mines[][]
+      set_position_target(cur_mine->lat, cur_mine->lon);            // Send a message to the Pixhawk telling it to move the drone
+      state = APPROACHING;
+      break;
+    case APPROACHING:
+      // if(close enough to target)
+      //   state = DROP;
       break;
     case DROP:          //dropping the payload
-      // TODO
+      // TODO: trigger payload drop
+      if(mines_index_col == MINES_PER_RUN-1) {
+        mines_index_col = 0;
+        mines_index_row++;
+      }
+      else {
+        mines_index_col++;
+      }
+      state = BEGIN_ESCAPE;
       break;
-    case ESCAPE:        // Drone just dropped a payload, should now be running away
+    case BEGIN_ESCAPE:  // Drone just dropped a payload, should now be running away
       // TODO: After each drop, check to see how many payloads are left. If there are none, return to base
+      if(mines_index_col == 0 || row_col_to_linear(mines_index_row,mines_index_col) >= num_mines) {
+        state = RETURN_HOME;
+      }
+      else {
+        // Get the direction of the next point relative to current location, generate a target point, and go there.
+        state = ESCAPING;
+      }
+      break;
+    case ESCAPING:
+      // if(close enough to target [escape point])
+      //   state = BEGIN_APPROACH;
       break;
     case RETURN_HOME:   // Drone returns back to base
       // TODO: RTL

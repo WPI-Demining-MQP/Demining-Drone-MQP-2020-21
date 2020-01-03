@@ -8,8 +8,8 @@
 #define EARTH_RADIUS 6371000.0 // 6371 km
 #define MINES_PER_RUN 6
 #define MAX_NUM_MINES 256
-#define degToRad(deg) deg * PI/180.0
-#define NUM_MINES 64
+#define deg_to_rad(deg) deg * PI/180.0
+#define row_col_to_linear(row,col) (row*MINES_PER_RUN) + col
 
 // Mine datatype
 struct mine_t {
@@ -28,7 +28,9 @@ struct node_t {
 
 // Structured mine array
 extern mine_t mines[(MAX_NUM_MINES / MINES_PER_RUN) + 1][MINES_PER_RUN];
-extern uint32_t mines_index;
+extern uint32_t mines_index_row;
+extern uint32_t mines_index_col;
+extern uint16_t num_mines;
 
 void LL_add(node_t**, mine_t*);
 void LL_remove(node_t**, mine_t*);

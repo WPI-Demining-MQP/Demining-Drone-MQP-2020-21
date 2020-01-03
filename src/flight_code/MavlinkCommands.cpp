@@ -9,7 +9,7 @@ enum command_status_t command_status;
 
 int32_t cmd_last_sent_time = -1;  // time since last command was sent
 MAV_CMD cmd_last_sent_type;       // type of the last command sent
-float cmd_last_send_param;        // parameter of the last command sent
+float cmd_last_sent_param;        // parameter of the last command sent
 
 void setup_mavlink(HardwareSerial *serial_ptr) {
   mav_port = serial_ptr;
@@ -36,10 +36,10 @@ int receive_mavlink(mavlink_message_t *msg_ptr, mavlink_status_t *stat_ptr) {
   return 0;   // If we made it this far, then we didn't get a message this time
 }
 
-// Given a message, serializes it and sends it over MAV_PORT
-void send_mavlink(mavlink_message_t msg) {
-  uint8_t buf[100];
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);   // Serialize the message - convert it into an array of bytes
+// Given a pointer to a message, this function converts it to an array of bytes sends it over MAV_PORT
+void send_mavlink(mavlink_message_t* msg_ptr) {
+  uint8_t buf[BUF_SIZE];  // Memory location for the message
+  uint16_t len = mavlink_msg_to_send_buffer(buf, msg_ptr);   // Serialize the message - convert it into an array of bytes
   mav_port->write(buf,len);  // Send the message
 }
 
@@ -64,7 +64,7 @@ void set_command_status(mavlink_message_t *msg, mavlink_status_t *stat) {
 // Arms the drone
 void arm(bool resend) {
   mavlink_message_t msg;
-  uint8_t confirmation = 0;
+  static uint8_t confirmation = 0;
   if(resend == true)
     confirmation++;
   else
@@ -72,9 +72,9 @@ void arm(bool resend) {
   // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter set,
   // into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_COMPONENT_ARM_DISARM, confirmation, ARM_CONDITION,0,0,0,0,0,0); // ARM
-  send_mavlink(msg);
+  send_mavlink(&msg);
   cmd_last_sent_time = millis();
-  cmd_last_sent_type = MAV_CMD_NAV_TAKEOFF;
+  cmd_last_sent_type = MAV_CMD_COMPONENT_ARM_DISARM;
   cmd_last_sent_param = ARM_CONDITION;
   command_status = SENT;
 }
@@ -82,7 +82,7 @@ void arm(bool resend) {
 // Disarm the drone
 void disarm(bool resend) {
   mavlink_message_t msg;
-  uint8_t confirmation = 0;
+  static uint8_t confirmation = 0;
   if(resend == true)
     confirmation++;
   else
@@ -90,10 +90,10 @@ void disarm(bool resend) {
   // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter cleared,
   // into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_COMPONENT_ARM_DISARM, confirmation, DISARM_CONDITION,0,0,0,0,0,0); // DISARM
-  send_mavlink(msg);
+  send_mavlink(&msg);
   cmd_last_sent_time = millis();
-  cmd_last_sent_type = MAV_CMD_NAV_TAKEOFF;
-  cmd_last_send_param = DISARM_CONDITION;
+  cmd_last_sent_type = MAV_CMD_COMPONENT_ARM_DISARM;
+  cmd_last_sent_param = DISARM_CONDITION;
   command_status = SENT;
 }
 
@@ -102,7 +102,7 @@ void disarm(bool resend) {
 // Maintains lat/lon position
 void takeoff(bool resend) {
   mavlink_message_t msg;
-  uint8_t confirmation = 0;
+  static uint8_t confirmation = 0;
   if(resend == true)
     confirmation++;
   else
@@ -110,10 +110,16 @@ void takeoff(bool resend) {
   // Pack a MAV_CMD_NAV_TAKEOFF command with the altitude parameter set,
   // into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_NAV_TAKEOFF, confirmation, 0,0,0,0,0,0,OPERATING_ALT); // TAKEOFF
-  send_mavlink(msg);
+  send_mavlink(&msg);
   cmd_last_sent_time = millis();
   cmd_last_sent_type = MAV_CMD_NAV_TAKEOFF;
   command_status = SENT;
+}
+
+void set_position_target(uint32_t target_lat, uint32_t target_lon) {
+  mavlink_message_t msg;
+  mavlink_msg_set_position_target_global_int_pack(SYS_ID, COMP_ID, &msg, millis(), TARGET_SYS, TARGET_COMP, MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, SET_POS_TYPE_MASK, target_lat, target_lon, OPERATING_ALT, 0,0,0, 0,0,0, 0,0);
+  send_mavlink(&msg);
 }
 
 void check_timeouts() {
@@ -126,11 +132,15 @@ void check_timeouts() {
 }
 
 void resend() {
-  switch(cmd_last_sent_type) {
-    case MAV_CMD_NAV_TAKEOFF:
-      takeoff(true);
-      break;
-    default:
-      break;
+  if(cmd_last_sent_type == MAV_CMD_NAV_TAKEOFF) {
+    takeoff(true);
+  }
+  else if(cmd_last_sent_type == MAV_CMD_COMPONENT_ARM_DISARM) {
+    if(cmd_last_sent_param == ARM_CONDITION) {
+      arm(true);
+    }
+    else if(cmd_last_sent_param == DISARM_CONDITION) {
+      disarm(true);
+    }
   }
 }
