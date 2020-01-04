@@ -46,6 +46,7 @@ void arm(bool resend = false);
 void disarm(bool resend = false);
 void takeoff(bool resend = false);
 void set_position_target(uint32_t, uint32_t);
+void return_to_launch(bool resend = false);
 void check_timeouts();
 void resend();
 

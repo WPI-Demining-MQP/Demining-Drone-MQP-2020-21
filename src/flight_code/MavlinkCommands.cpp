@@ -69,8 +69,7 @@ void arm(bool resend) {
     confirmation++;
   else
     confirmation = 0;
-  // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter set,
-  // into a command_long message
+  // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter set, into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_COMPONENT_ARM_DISARM, confirmation, ARM_CONDITION,0,0,0,0,0,0); // ARM
   send_mavlink(&msg);
   cmd_last_sent_time = millis();
@@ -87,8 +86,7 @@ void disarm(bool resend) {
     confirmation++;
   else
     confirmation = 0;
-  // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter cleared,
-  // into a command_long message
+  // Pack a MAV_CMD_COMPONENT_ARM_DISARM command with the arm parameter cleared, into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_COMPONENT_ARM_DISARM, confirmation, DISARM_CONDITION,0,0,0,0,0,0); // DISARM
   send_mavlink(&msg);
   cmd_last_sent_time = millis();
@@ -107,8 +105,7 @@ void takeoff(bool resend) {
     confirmation++;
   else
     confirmation = 0;
-  // Pack a MAV_CMD_NAV_TAKEOFF command with the altitude parameter set,
-  // into a command_long message
+  // Pack a MAV_CMD_NAV_TAKEOFF command with the altitude parameter set, into a command_long message
   mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_NAV_TAKEOFF, confirmation, 0,0,0,0,0,0,OPERATING_ALT); // TAKEOFF
   send_mavlink(&msg);
   cmd_last_sent_time = millis();
@@ -116,10 +113,26 @@ void takeoff(bool resend) {
   command_status = SENT;
 }
 
+// Sets a target position for the drone to fly to
 void set_position_target(uint32_t target_lat, uint32_t target_lon) {
   mavlink_message_t msg;
   mavlink_msg_set_position_target_global_int_pack(SYS_ID, COMP_ID, &msg, millis(), TARGET_SYS, TARGET_COMP, MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, SET_POS_TYPE_MASK, target_lat, target_lon, OPERATING_ALT, 0,0,0, 0,0,0, 0,0);
   send_mavlink(&msg);
+}
+
+// Send to drone back to the takeoff point and land there
+void return_to_launch(bool resend) {
+  mavlink_message_t msg;
+  static uint8_t confirmation = 0;
+  if(resend == true)
+    confirmation++;
+  else
+    confirmation = 0;
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_NAV_RETURN_TO_LAUNCH, confirmation, 0,0,0,0,0,0,0); // RTL
+  send_mavlink(&msg);
+  cmd_last_sent_time = millis();
+  cmd_last_sent_type = MAV_CMD_NAV_RETURN_TO_LAUNCH;
+  command_status = SENT;
 }
 
 void check_timeouts() {

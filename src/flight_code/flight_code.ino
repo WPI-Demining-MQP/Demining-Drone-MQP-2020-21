@@ -20,7 +20,7 @@ int32_t home_lat = 422756340, home_lon = -718030810;
 
 // State machine states
 // I'm sure we'll need to add more of these
-enum state_t {DISARMED, TAKEOFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, RETURN_HOME, DONE, ABORT} state;
+enum state_t {DISARMED, TAKEOFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, BEGIN_RETURN_HOME, RETURNING_HOME, DONE, ABORT} state;
 
 
 void setup() {
@@ -81,12 +81,12 @@ void loop() {
       break;
     case BEGIN_ESCAPE:  // Drone just dropped a payload, should now be running away
       if(mines_index % MINES_PER_RUN == 0 || mines_index >= num_mines) {
-        state = RETURN_HOME;
+        state = BEGIN_RETURN_HOME;
       }
       else {
         // Get the direction of the next point relative to current location, generate a target point, and go there.
-        double target_lat;
-        double target_lon;
+        uint32_t target_lat;
+        uint32_t target_lon;
         get_escape_point(&target_lat, &target_lon);
         set_position_target(target_lat, target_lon);
         state = ESCAPING;
@@ -96,8 +96,14 @@ void loop() {
       // if(close enough to target [escape point])
       //   state = BEGIN_APPROACH;
       break;
-    case RETURN_HOME:   // Drone returns back to base
-      // TODO: RTL
+    case BEGIN_RETURN_HOME:   // Drone returns back to base
+      return_to_launch();
+      state = RETURNING_HOME;
+      break;
+    case RETURNING_HOME:
+      // if(landed)
+      //   disarm();
+      //   state = DISARMED;
       break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
       // TODO

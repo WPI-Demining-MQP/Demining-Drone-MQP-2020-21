@@ -83,12 +83,12 @@ double heading_to(int32_t lat1, int32_t lon1, int32_t lat2, int32_t lon2) {
   return(atan2(cos(lat2)*sin(delta_lon), cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(delta_lon)));
 }
 
-void get_escape_point(uint32_t* target_lat_ptr, uint32_t target_lon_ptr) {
+void get_escape_point(uint32_t* target_lat_ptr, uint32_t* target_lon_ptr) {
   double next_heading = heading_to(mines[mines_index-1].lat, mines[mines_index-1].lon, mines[mines_index].lat, mines[mines_index].lon);
   double cur_lat = mines[mines_index-1].lat;
   double cur_lon = mines[mines_index-1].lon;
-  *target_lat_ptr = asin(sin(cur_lat)*cos(ANGULAR_ESCAPE_DIST) + cos(cur_lat)*sin(ANGULAR_ESCAPE_DIST)*cos(next_heading));
-  *target_lon_ptr = cur_lon + atan2(sin(next_heading)*sin(ANGULAR_ESCAPE_DIST)*cos(cur_lat), cos(ANGULAR_ESCAPE_DIST) - sin(cur_lat)*sin(target_lat));
+  *target_lat_ptr = (uint32_t)(1.0E7*asin(sin(cur_lat)*cos(ANGULAR_ESCAPE_DIST) + cos(cur_lat)*sin(ANGULAR_ESCAPE_DIST)*cos(next_heading)));
+  *target_lon_ptr = (uint32_t)(1.0E7*(cur_lon + atan2(sin(next_heading)*sin(ANGULAR_ESCAPE_DIST)*cos(cur_lat), cos(ANGULAR_ESCAPE_DIST) - sin(cur_lat)*sin(*target_lat_ptr))));
 }
 
 // Plan the path
