@@ -1,7 +1,7 @@
 #include "PathPlan.h"
 
 // Structured mine array
-mine_t mines[(MAX_NUM_MINES / MINES_PER_RUN) + 1][MINES_PER_RUN];
+mine_t mines[MAX_NUM_MINES];
 uint16_t mines_index = 0;
 uint16_t num_mines = 0;
 
@@ -77,21 +77,20 @@ double dist_to(int32_t lat1, int32_t lon1, int32_t lat2, int32_t lon2) {
 
 // Plan the path
 void plan_path(int32_t home_lat, int32_t home_lon, node_t** head_ref) {
-    int row = 0;
+    int index = 0;
     while (*head_ref != NULL) {  // Keep going until the linked list is empty
         mine_t* primary = closest_to(home_lat, home_lon, *head_ref);    // find the closest mine in the list to the home location
-        memcpy(&mines[row][0], primary, sizeof(mine_t));                // copy the info for this mine into the structured mines array
+        memcpy(&mines[index++], primary, sizeof(mine_t));                 // copy the info for this mine into the structured mines array
         num_mines++;                                                    // increment the total number of mines in the path
         LL_remove(head_ref, primary);                                   // remove this mine from the linked list
 
         for (int i = 1; i < MINES_PER_RUN; i++) {       // Find MINES_PER_RUN-1 other mines and place them in the sorted array
             mine_t* secondary = closest_to(primary->lat, primary->lon, *head_ref);
-            memcpy(&mines[row][i], secondary, sizeof(mine_t));
+            memcpy(&mines[index++], secondary, sizeof(mine_t));
             num_mines++;
             LL_remove(head_ref, secondary);
             if (*head_ref == NULL)   // if we run out of mines (empty linked list) then exit the loop
                 break;
         }
-        row++;  // once we've filled one row, increment the row counter
     }
 }

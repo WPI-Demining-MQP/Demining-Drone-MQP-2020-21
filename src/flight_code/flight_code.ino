@@ -42,10 +42,10 @@ void setup() {
   
   // Plan the drone's path through the minefield
   plan_path(home_lat, home_lon, &head);
-  // At this point, all mines are stored in a global 2D array (n x 6) called "mines".
+  // At this point, all mines are stored in a global array called "mines".
   // The current position in this array is storred in a global index called "mines_index"
-  // The current mine can be accessed as mines[mines_index / 6][mines_index % 6]
-  // When mines_index % 6 == 5 (or zero, depends on how we implement it) it's time to return to the base station to get more sandbags
+  // The current mine can be accessed as mines[mines_index]
+  // When mines_index % MINES_PER_RUN == 0 it's time to return to the base station to get more sandbags
 }
 
 void loop() {
@@ -67,8 +67,7 @@ void loop() {
       }
       break;
     case BEGIN_APPROACH:      // Approaching a mine
-      mine_t* cur_mine = &mines[mines_index / MINES_PER_RUN][mines_index % MINES_PER_RUN];  // pointer to the current mine in mines[][]
-      set_position_target(cur_mine->lat, cur_mine->lon);                                    // Send a message to the Pixhawk telling it to move the drone
+      set_position_target(mines[mines_index].lat, mines[mines_index].lon);                                    // Send a message to the Pixhawk telling it to move the drone
       state = APPROACHING;
       break;
     case APPROACHING:
@@ -81,7 +80,6 @@ void loop() {
       state = BEGIN_ESCAPE;
       break;
     case BEGIN_ESCAPE:  // Drone just dropped a payload, should now be running away
-      // TODO: After each drop, check to see how many payloads are left. If there are none, return to base
       if(mines_index % MINES_PER_RUN == 0 || mines_index >= num_mines) {
         state = RETURN_HOME;
       }

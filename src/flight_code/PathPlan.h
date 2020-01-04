@@ -9,7 +9,6 @@
 #define MINES_PER_RUN 6
 #define MAX_NUM_MINES 256
 #define deg_to_rad(deg) deg * PI/180.0
-#define row_col_to_linear(row,col) (row*MINES_PER_RUN) + col
 
 // Mine datatype
 struct mine_t {
@@ -27,7 +26,7 @@ struct node_t {
 #define NODE_T_SIZE sizeof(node_t)
 
 // Structured mine array
-extern mine_t mines[(MAX_NUM_MINES / MINES_PER_RUN) + 1][MINES_PER_RUN];
+extern mine_t mines[MAX_NUM_MINES];
 extern uint16_t mines_index;
 extern uint16_t num_mines;
 
