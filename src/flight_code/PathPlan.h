@@ -10,6 +10,10 @@
 #define MAX_NUM_MINES 256
 #define deg_to_rad(deg) deg * PI/180.0
 
+// Distance to travel when escaping a detonation
+#define ESCAPE_DIST 10  // 10 meters
+#define ANGULAR_ESCAPE_DIST ESCAPE_DIST/EARTH_RADIUS
+
 // Mine datatype
 struct mine_t {
     int32_t lat;
@@ -35,6 +39,8 @@ void LL_remove(node_t**, mine_t*);
 bool mine_t_equals(mine_t, mine_t);
 mine_t* closest_to(int32_t, int32_t, node_t*);
 double dist_to(int32_t, int32_t, int32_t, int32_t);
+double heading_to(int32_t, int32_t, int32_t, int32_t);
+void get_escape_point(uint32_t*, uint32_t*);
 void plan_path(int32_t, int32_t, node_t**);
 
 #endif

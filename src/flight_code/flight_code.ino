@@ -85,6 +85,10 @@ void loop() {
       }
       else {
         // Get the direction of the next point relative to current location, generate a target point, and go there.
+        double target_lat;
+        double target_lon;
+        get_escape_point(&target_lat, &target_lon);
+        set_position_target(target_lat, target_lon);
         state = ESCAPING;
       }
       break;

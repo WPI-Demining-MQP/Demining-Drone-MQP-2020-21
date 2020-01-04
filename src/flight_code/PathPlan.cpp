@@ -75,12 +75,28 @@ double dist_to(int32_t lat1, int32_t lon1, int32_t lat2, int32_t lon2) {
     return EARTH_RADIUS * 2.0 * atan2(sqrt(a), sqrt(1 - a));
 }
 
+// Heading of point 2 relative to point 1
+double heading_to(int32_t lat1, int32_t lon1, int32_t lat2, int32_t lon2) {
+  double delta_lon = deg_to_rad(((lon2-lon1)/1.0E7));
+  lat1 = deg_to_rad((lat1/1.0E7));
+  lat2 = deg_to_rad((lat2/1.0E7));
+  return(atan2(cos(lat2)*sin(delta_lon), cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(delta_lon)));
+}
+
+void get_escape_point(uint32_t* target_lat_ptr, uint32_t target_lon_ptr) {
+  double next_heading = heading_to(mines[mines_index-1].lat, mines[mines_index-1].lon, mines[mines_index].lat, mines[mines_index].lon);
+  double cur_lat = mines[mines_index-1].lat;
+  double cur_lon = mines[mines_index-1].lon;
+  *target_lat_ptr = asin(sin(cur_lat)*cos(ANGULAR_ESCAPE_DIST) + cos(cur_lat)*sin(ANGULAR_ESCAPE_DIST)*cos(next_heading));
+  *target_lon_ptr = cur_lon + atan2(sin(next_heading)*sin(ANGULAR_ESCAPE_DIST)*cos(cur_lat), cos(ANGULAR_ESCAPE_DIST) - sin(cur_lat)*sin(target_lat));
+}
+
 // Plan the path
 void plan_path(int32_t home_lat, int32_t home_lon, node_t** head_ref) {
     int index = 0;
     while (*head_ref != NULL) {  // Keep going until the linked list is empty
         mine_t* primary = closest_to(home_lat, home_lon, *head_ref);    // find the closest mine in the list to the home location
-        memcpy(&mines[index++], primary, sizeof(mine_t));                 // copy the info for this mine into the structured mines array
+        memcpy(&mines[index++], primary, sizeof(mine_t));               // copy the info for this mine into the structured mines array
         num_mines++;                                                    // increment the total number of mines in the path
         LL_remove(head_ref, primary);                                   // remove this mine from the linked list
 
