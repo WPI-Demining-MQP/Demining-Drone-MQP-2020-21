@@ -15,8 +15,12 @@
 #define DEBUG_BAUD 115200
 #define MAV_BAUD   19200
 
+#define UNRESPONSIVE_SYSTEM_TIMEOUT 3000  // Maximum allowable time (in ms) without getting a heartbeat from the Pixhawk before we raise red flags
+
 // Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
 int32_t home_lat = 422756340, home_lon = -718030810;
+
+uint32_t last_heartbeat_time = 0;   // Time that the last heartbeat message was received
 
 // State machine states
 // I'm sure we'll need to add more of these
@@ -42,10 +46,18 @@ void setup() {
   
   // Plan the drone's path through the minefield
   plan_path(home_lat, home_lon, &head);
-  // At this point, all mines are stored in a global array called "mines".
-  // The current position in this array is storred in a global index called "mines_index"
-  // The current mine can be accessed as mines[mines_index]
-  // When mines_index % MINES_PER_RUN == 0 it's time to return to the base station to get more sandbags
+
+  // Ensure we have a heartbeat from the Pixhawk before continuing to the state machine
+  mavlink_message_t msg_in;
+  mavlink_status_t stat_in;
+  uint8_t system_status = MAV_STATE_UNINIT;           // initial system state is unknown
+  while(system_status != MAV_STATE_STANDBY) {         // Sit in this while loop until we get a heartbeat from the Pixhawk telling us it's ready to fly
+    if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
+      if(msg_in.msgid == MAVLINK_MSG_ID_HEARTBEAT) {  // Check the message ID of an received message
+        system_status = mavlink_msg_heartbeat_get_system_status(&msg_in);   // This message was a heartbeat - record the stated system status
+      }
+    }
+  }
 }
 
 void loop() {
@@ -67,7 +79,7 @@ void loop() {
       }
       break;
     case BEGIN_APPROACH:      // Approaching a mine
-      set_position_target(mines[mines_index].lat, mines[mines_index].lon);                                    // Send a message to the Pixhawk telling it to move the drone
+      set_position_target(mines[mines_index].lat, mines[mines_index].lon);    // Send a message to the Pixhawk telling it to move the drone
       state = APPROACHING;
       break;
     case APPROACHING:
@@ -84,11 +96,10 @@ void loop() {
         state = BEGIN_RETURN_HOME;
       }
       else {
-        // Get the direction of the next point relative to current location, generate a target point, and go there.
-        uint32_t target_lat;
-        uint32_t target_lon;
-        get_escape_point(&target_lat, &target_lon);
-        set_position_target(target_lat, target_lon);
+        // Generate a target point to escape to, and go there
+        uint32_t target_lat, target_lon;  // Make a spot in memory for the target point
+        get_escape_point(&target_lat, &target_lon);   // Calculate the target lat/lon. This function will place the target values in the variables pointed to by the function arguments
+        set_position_target(target_lat, target_lon);  // Send the drone to the target point
         state = ESCAPING;
       }
       break;
@@ -96,14 +107,16 @@ void loop() {
       // if(close enough to target [escape point])
       //   state = BEGIN_APPROACH;
       break;
-    case BEGIN_RETURN_HOME:   // Drone returns back to base
+    case BEGIN_RETURN_HOME:   // Tells the Pixhawk to fly back to the launch point
       return_to_launch();
       state = RETURNING_HOME;
       break;
-    case RETURNING_HOME:
-      // if(landed)
-      //   disarm();
-      //   state = DISARMED;
+    case RETURNING_HOME:      // Drone is in the process of flying back to the launch point
+      if(command_status == ACCEPTED) {
+        command_status = COMPLETED;
+        disarm();
+        state = DISARMED;
+      }
       break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
       // TODO
@@ -124,7 +137,15 @@ void loop() {
       case MAVLINK_MSG_ID_COMMAND_ACK:
         set_command_status(&msg_in, &stat_in);
         break;
+      case MAVLINK_MSG_ID_HEARTBEAT:
+        last_heartbeat_time == millis();
+        break;
     }
+  }
+
+  if(millis() - last_heartbeat_time > UNRESPONSIVE_SYSTEM_TIMEOUT) {
+    // It's been too long since the Pixhawk has sent a heartbeat - something has gone wrong
+    // TODO: Notify the base station that we have a problem
   }
 
   // Ensure that the last Mavlink message sent to the Pixhawk was acknowledged within the timeout

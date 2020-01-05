@@ -156,4 +156,7 @@ void resend() {
       disarm(true);
     }
   }
+  else if(cmd_last_sent_type == MAV_CMD_NAV_RETURN_TO_LAUNCH) {
+    return_to_launch(true);
+  }
 }
