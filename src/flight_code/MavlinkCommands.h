@@ -38,7 +38,7 @@ extern int32_t cmd_last_sent_time;  // time since last command was sent
 extern MAV_CMD cmd_last_sent_type;  // type of the last command sent
 extern float   cmd_last_sent_param; // parameter of the last command sent
 
-void setup_mavlink(HardwareSerial*);
+void setup_mavlink(HardwareSerial*, uint32_t);
 int receive_mavlink(mavlink_message_t*, mavlink_status_t*);
 void send_mavlink(mavlink_message_t*);
 void set_command_status(mavlink_message_t*, mavlink_status_t*);

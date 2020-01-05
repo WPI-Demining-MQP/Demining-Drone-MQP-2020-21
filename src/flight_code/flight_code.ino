@@ -5,6 +5,7 @@
  *  Authors (Drone team members): Jessica McKenna, Joeseph Niski, Adam Santos, and Andrew VanOsten
  */
 
+#include "BaseStationComms.h"
 #include "MavlinkCommands.h"
 #include "PathPlan.h"
 
@@ -12,8 +13,10 @@
 // These are the hardware serial ports on the Teensy
 #define DEBUG_PORT Serial   // Debugging port (USB)
 #define MAV_PORT   Serial1  // MAVLink port
+#define COMMS_PORT Serial2  // Base station comms port
 #define DEBUG_BAUD 115200
 #define MAV_BAUD   19200
+#define COMMS_BAUD 19200
 
 #define UNRESPONSIVE_SYSTEM_TIMEOUT 3000  // Maximum allowable time (in ms) without getting a heartbeat from the Pixhawk before we raise red flags
 
@@ -29,9 +32,9 @@ enum state_t {DISARMED, TAKEOFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE
 
 void setup() {
   DEBUG_PORT.begin(DEBUG_BAUD);
-  MAV_PORT.begin(MAV_BAUD);
 
-  setup_mavlink(&MAV_PORT);
+  setup_mavlink(&MAV_PORT, MAV_BAUD);   // initialize the mavlink connection
+  setup_comms(&COMMS_PORT, COMMS_BAUD); // initialize the base station connection
 
   // Determine fixed dGPS location before takeoff
   // Wait for confirmation message about fixed dGPS location before proceeding
@@ -138,7 +141,7 @@ void loop() {
         set_command_status(&msg_in, &stat_in);
         break;
       case MAVLINK_MSG_ID_HEARTBEAT:
-        last_heartbeat_time == millis();
+        last_heartbeat_time = millis();
         break;
     }
   }

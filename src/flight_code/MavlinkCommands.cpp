@@ -11,8 +11,9 @@ int32_t cmd_last_sent_time = -1;  // time since last command was sent
 MAV_CMD cmd_last_sent_type;       // type of the last command sent
 float cmd_last_sent_param;        // parameter of the last command sent
 
-void setup_mavlink(HardwareSerial *serial_ptr) {
+void setup_mavlink(HardwareSerial *serial_ptr, uint32_t mav_baud) {
   mav_port = serial_ptr;
+  mav_port->begin(mav_baud);
 }
 
 // Reads from MAV_PORT until either:
