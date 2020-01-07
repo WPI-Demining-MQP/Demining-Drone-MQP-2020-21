@@ -18,7 +18,7 @@
 #define MAV_BAUD   19200
 #define COMMS_BAUD 19200
 
-#define UNRESPONSIVE_SYSTEM_TIMEOUT 3000  // Maximum allowable time (in ms) without getting a heartbeat from the Pixhawk before we raise red flags
+#define UNRESPONSIVE_SYSTEM_TIMEOUT 3000  // Maximum allowable time (in ms) without getting a heartbeat (flight controller or base station) before we raise red flags
 
 // Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
 int32_t home_lat = 422756340, home_lon = -718030810;
@@ -119,7 +119,6 @@ void loop() {
       if(in_flight) {
         state = BEGIN_TAKEOFF;
       }
-      // Not 100% sure it's possible to arm like this - needs more testing
       break;
     case BEGIN_TAKEOFF:
       arm();      // Arm the drone
@@ -160,6 +159,7 @@ void loop() {
       }
       break;
     case ESCAPING:
+      // TODO
       // if(close enough to target [escape point])
       //   state = BEGIN_APPROACH;
       break;
@@ -171,15 +171,18 @@ void loop() {
       if(command_status == ACCEPTED) {
         command_status = COMPLETED;
         disarm();
-        state = DISARMED;
         in_flight = false;
+        if(mines_index == num_mines)
+          state = DONE;
+        else
+          state = DISARMED;
       }
       break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
-      // TODO
+      state = BEGIN_RETURN_HOME;  // Send it home.
       break;
     case DONE:          // Mission completed, state will remain here
-      // TODO: Maybe send a done message to the base station
+      send_msg_status("Mission complete - drone disabled");
       break;
   }
   
@@ -209,6 +212,8 @@ void loop() {
       case MSG_TAKEOFF:
         in_flight = true;
         break;
+      case MSG_ABORT:
+        state = ABORT;  // If we get an abort message, stop the current process and go to the abort case
     }
   }
   

@@ -28,7 +28,8 @@ enum message_types { MSG_HEARTBEAT=0,   // Heartbeat - sent to and received from
                      MSG_STATUS=1,      // Status message - sending a string to the base station to update the user and debug
                      MSG_MINEFIELD=2,   // Minefield info - received from the base station. Basically just telling the drone how many mines to expect
                      MSG_MINE=3,        // Mine info - received from the base station. Coordinates for a single mine
-                     MSG_TAKEOFF=4      // Signal from the base station to takeoff. Used as a trigger at the beggining of a run, or after a sandbag reload
+                     MSG_TAKEOFF=4,     // Signal from the base station to takeoff. Used as a trigger at the beggining of a run, or after a sandbag reload
+                     MSG_ABORT=5        // Signal from the base station to abort the current process and return to launch
 };
 
 enum parse_status_t { PARSE_UNINIT, PARSE_IDLE, PARSE_TYPE, PARSE_LEN, PARSE_DATA, PARSE_PARITY };
