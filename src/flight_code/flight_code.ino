@@ -23,11 +23,17 @@
 // Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
 int32_t home_lat = 422756340, home_lon = -718030810;
 
-uint32_t last_heartbeat_time = 0;   // Time that the last heartbeat message was received
+uint32_t last_fc_heartbeat_received = 0;    // Time that the last heartbeat message was received from the flight controller
+uint32_t last_bs_heartbeat_received = 0;    // Time that the last heartbeat message was received from the base station
+uint32_t last_bs_heartbeat_sent = 0;        // Time that the last heartbeat message was sent to the base station
 
 // State machine states
 // I'm sure we'll need to add more of these
 enum state_t {DISARMED, TAKEOFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, BEGIN_RETURN_HOME, RETURNING_HOME, DONE, ABORT} state;
+
+packet_t packet_in; // Global packet to use for incoming data from the base station
+bool base_station_active = false; // Global to keep track of whether the base station is sending messages or not
+bool in_flight = false;
 
 
 void setup() {
@@ -36,44 +42,91 @@ void setup() {
   setup_mavlink(&MAV_PORT, MAV_BAUD);   // initialize the mavlink connection
   setup_comms(&COMMS_PORT, COMMS_BAUD); // initialize the base station connection
 
-  // Determine fixed dGPS location before takeoff
-  // Wait for confirmation message about fixed dGPS location before proceeding
-  
-  // Read minefield data (unordered list of mines) from base station, into linked list
-  // TODO: ^
-  // head of the linked list that stores the incoming mine data
-  node_t* head = NULL;
-  // gather incoming minefield data and place it into a linked list
-  // This call will be blocking as data is received
-  get_minefield_data(&head);
-  
-  // Plan the drone's path through the minefield
-  plan_path(home_lat, home_lon, &head);
-
-  // Ensure we have a heartbeat from the Pixhawk before continuing to the state machine
+  bool flight_controller_ready = false, minefield_data_acquired = false, dGPS_ready = false;
+  uint16_t num_mines_received = 0;
+  node_t* head = NULL;    // head of the linked list that stores the incoming mine data
   mavlink_message_t msg_in;
   mavlink_status_t stat_in;
-  uint8_t system_status = MAV_STATE_UNINIT;           // initial system state is unknown
-  while(system_status != MAV_STATE_STANDBY) {         // Sit in this while loop until we get a heartbeat from the Pixhawk telling us it's ready to fly
+  uint8_t system_status = MAV_STATE_UNINIT;   // initial flight controller state is unknown
+  
+  while(!flight_controller_ready || !minefield_data_acquired || !dGPS_ready) {
+    while(COMMS_PORT.available()) {
+      if(receive_byte(&packet_in, COMMS_PORT.read())) {
+        if(packet_in.msg_type == MSG_HEARTBEAT) {
+          base_station_active = true;
+        }
+        else if(packet_in.msg_type == MSG_MINEFIELD) {
+          num_mines = parse_msg_minefield(&packet_in);
+        }
+        else if(packet_in.msg_type == MSG_MINE && !minefield_data_acquired) {
+          if(num_mines == 0) {  // We got a mine message before we were ready for it
+            send_msg_status("ERROR: Mine data received without minefield data");
+          }
+          else {
+            uint32_t lat,lon;
+            parse_msg_mine(&packet_in, &lat, &lon);
+            struct mine_t* new_mine = (struct mine_t*)malloc(MINE_T_SIZE);  // allocate some memory for the new mine data
+            new_mine->lat = lat;
+            new_mine->lon = lon;
+            new_mine->isDetonated = false;  // assume the mine is live
+            LL_add(&head, new_mine);  // Add the new mine to the linked list
+            num_mines_received++;
+            
+            if(num_mines_received == num_mines) {
+              minefield_data_acquired = true;
+              send_msg_status("Minefield data transfer complete");
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    // Ensure we have a heartbeat from the Pixhawk before continuing to the state machine
     if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
       if(msg_in.msgid == MAVLINK_MSG_ID_HEARTBEAT) {  // Check the message ID of an received message
         system_status = mavlink_msg_heartbeat_get_system_status(&msg_in);   // This message was a heartbeat - record the stated system status
+        if(system_status == MAV_STATE_STANDBY) {
+          flight_controller_ready = true;
+        }
+      }
+    }
+
+    // TODO: Determine fixed dGPS location before takeoff
+    //       Wait for confirmation message about fixed dGPS location before proceeding
+    //       Keep the base station up to date with the status of the dGPS
+
+    // Send a heartbeat to the base station every second (ish)
+    if(base_station_active) {
+      uint32_t cur_time = millis();
+      if(cur_time - last_bs_heartbeat_sent >= 1000) {
+        last_bs_heartbeat_sent = cur_time;
+        send_msg_heartbeat();
       }
     }
   }
+
+  // Plan the drone's path through the minefield
+  send_msg_status("Planning flight path...");
+  plan_path(home_lat, home_lon, &head);
+  send_msg_status("Flight path planning complete");
 }
 
 void loop() {
   // Main state machine - this handles the primary program flow
   switch(state) {
     case DISARMED:      // Disarmed, sitting on the ground
-      // If we get the go signal from the base station:
-      //   arm();
-      //   state = TAKEOFF;
+      if(in_flight) {
+        state = BEGIN_TAKEOFF;
+      }
       // Not 100% sure it's possible to arm like this - needs more testing
       break;
-    case TAKEOFF:       // Actively taking off
-      takeoff();
+    case BEGIN_TAKEOFF:
+      arm();      // Arm the drone
+      takeoff();  // Initiate takeoff
+      state = TAKING_OFF;
+      break;
+    case TAKING_OFF:       // Actively taking off
       // listen for ACK response, and wait until complete
       if(command_status == ACCEPTED) {
         // takeoff complete, move on to mine approach
@@ -119,6 +172,7 @@ void loop() {
         command_status = COMPLETED;
         disarm();
         state = DISARMED;
+        in_flight = false;
       }
       break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
@@ -129,9 +183,6 @@ void loop() {
       break;
   }
   
-  // Check for incoming messages from the base station
-  // TODO: [Insert function call here]
-  
   // Check for incoming messages from the Pixhawk
   mavlink_message_t msg_in;
   mavlink_status_t stat_in;
@@ -141,31 +192,36 @@ void loop() {
         set_command_status(&msg_in, &stat_in);
         break;
       case MAVLINK_MSG_ID_HEARTBEAT:
-        last_heartbeat_time = millis();
+        last_fc_heartbeat_received = millis();
         break;
     }
   }
 
-  if(millis() - last_heartbeat_time > UNRESPONSIVE_SYSTEM_TIMEOUT) {
+  uint32_t cur_time = millis(); // Grab the current time for use below
+  
+  // Check for incoming messages from the base station
+  if(receive_message(&packet_in)) {
+    switch(packet_in.msg_id) {
+      case MSG_HEARTBEAT:
+        base_station_active = true;
+        last_bs_heartbeat_received = cur_time;
+        break;
+      case MSG_TAKEOFF:
+        in_flight = true;
+        break;
+    }
+  }
+  
+  if(cur_time - last_fc_heartbeat_received > UNRESPONSIVE_SYSTEM_TIMEOUT) {
     // It's been too long since the Pixhawk has sent a heartbeat - something has gone wrong
-    // TODO: Notify the base station that we have a problem
+    send_msg_status("ERROR: flight controller is unresponsive");
+  }
+  if(cur_time - last_bs_heartbeat_received > UNRESPONSIVE_SYSTEM_TIMEOUT) {
+    // It's been too long since the base station has sent a heartbeat - something has gone wrong
+    base_station_active = false;
   }
 
   // Ensure that the last Mavlink message sent to the Pixhawk was acknowledged within the timeout
   // If not, the command will be resent
   check_timeouts();
-}
-
-// Reads incoming minefield data from the base station and stored it in the linked list pointed to by head_ref
-// Note: this call is blocking - it will not return until all of the minefield data has been received
-void get_minefield_data(node_t** head_ref) {
-  // TODO
-//  while(we've got mines) {
-    // read some minefield data...
-    struct mine_t* new_mine = (struct mine_t*)malloc(MINE_T_SIZE);  // allocate some memory for the new mine data
-    new_mine->lat = NULL; // TODO: Put a latitude here
-    new_mine->lon = NULL; // TODO: Put a longitude here
-    new_mine->isDetonated = false;  // assume the mine is live
-    LL_add(head_ref, new_mine);  // Add the new mine to the linked list
-//  }
 }
