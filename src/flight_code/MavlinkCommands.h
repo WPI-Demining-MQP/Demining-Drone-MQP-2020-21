@@ -27,7 +27,7 @@
 // Command status variable
 // Each time we send a command to the Pixhawk, we need to wait for the appropriate response from the Pixhawk
 // These variables track the response so we can reference it in the state machine
-enum command_status_t {SENT, IN_PROGRESS, ACCEPTED, COMPLETED};
+enum command_status_t {SENT, IN_PROGRESS, ACCEPTED, COMPLETED, REJECTED};
 extern enum command_status_t command_status;
 
 // Timeout variables

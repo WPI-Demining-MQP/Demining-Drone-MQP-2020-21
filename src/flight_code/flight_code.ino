@@ -29,7 +29,7 @@ uint32_t last_bs_heartbeat_sent = 0;        // Time that the last heartbeat mess
 
 // State machine states
 // I'm sure we'll need to add more of these
-enum state_t {DISARMED, TAKEOFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, BEGIN_RETURN_HOME, RETURNING_HOME, DONE, ABORT} state;
+enum state_t {DISARMED, BEGIN_TAKEOFF, TAKING_OFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, BEGIN_RETURN_HOME, RETURNING_HOME, DONE, ABORT} state;
 
 packet_t packet_in; // Global packet to use for incoming data from the base station
 bool base_station_active = false; // Global to keep track of whether the base station is sending messages or not
@@ -138,6 +138,7 @@ void loop() {
       state = APPROACHING;
       break;
     case APPROACHING:
+      // TODO
       // if(close enough to target)
       //   state = DROP;
       break;
@@ -193,6 +194,11 @@ void loop() {
     switch(msg_in.msgid) {
       case MAVLINK_MSG_ID_COMMAND_ACK:
         set_command_status(&msg_in, &stat_in);
+        if(command_status == REJECTED) {
+          char error_msg[MAX_DATA_SIZE];
+          sprintf(error_msg, "ERROR: Flight controller rejected a command (ID#%d", mavlink_msg_command_ack_get_command(&msg_in));
+          send_msg_status(error_msg);
+        }
         break;
       case MAVLINK_MSG_ID_HEARTBEAT:
         last_fc_heartbeat_received = millis();
@@ -204,7 +210,7 @@ void loop() {
   
   // Check for incoming messages from the base station
   if(receive_message(&packet_in)) {
-    switch(packet_in.msg_id) {
+    switch(packet_in.msg_type) {
       case MSG_HEARTBEAT:
         base_station_active = true;
         last_bs_heartbeat_received = cur_time;

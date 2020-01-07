@@ -55,7 +55,7 @@ void set_command_status(mavlink_message_t *msg, mavlink_status_t *stat) {
           result == MAV_RESULT_UNSUPPORTED ||
           result == MAV_RESULT_FAILED) {
     // The Pixhawk returned an error - send something back to the base station
-    // TODO: Send and error message to the base station
+    command_status = REJECTED;
   }
   else if(result == MAV_RESULT_IN_PROGRESS) {
     command_status = IN_PROGRESS;
