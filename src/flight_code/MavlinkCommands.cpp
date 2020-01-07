@@ -136,6 +136,13 @@ void return_to_launch(bool resend) {
   command_status = SENT;
 }
 
+// Sends a message to the flight controller telling it to send a position estimate every 1 second
+void initiate_GPS_data() {
+  mavlink_message_t msg;
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_SET_MESSAGE_INTERVAL, 0, MAVLINK_MSG_ID_GLOBAL_POSITION_INT, 1000000,0,0,0,0,0);  // request GLOBAL_POSITION_INT at 1 Hz
+  send_mavlink(&msg);
+}
+
 void check_timeouts() {
   int32_t cur_time = millis();
   if(command_status == SENT) {

@@ -20,8 +20,13 @@
 
 #define UNRESPONSIVE_SYSTEM_TIMEOUT 3000  // Maximum allowable time (in ms) without getting a heartbeat (flight controller or base station) before we raise red flags
 
+#define DROP_TARGET_ERROR_MARGIN 0.05     // Minimum acceptable error (in meters) from the target point when the drone is about to drop a payload
+#define ESCAPE_TARGET_ERROR_MARGIN 0.5    // Minimum acceptable error (in meters) from the target point when the drone is escaping
+
 // Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
 int32_t home_lat = 422756340, home_lon = -718030810;
+int32_t current_lat, current_lon;   // Current lat/lon of the drone
+uint32_t target_lat, target_lon;    // Target lat/lon for each movement
 
 uint32_t last_fc_heartbeat_received = 0;    // Time that the last heartbeat message was received from the flight controller
 uint32_t last_bs_heartbeat_received = 0;    // Time that the last heartbeat message was received from the base station
@@ -83,11 +88,13 @@ void setup() {
     }
 
     // Ensure we have a heartbeat from the Pixhawk before continuing to the state machine
-    if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
-      if(msg_in.msgid == MAVLINK_MSG_ID_HEARTBEAT) {  // Check the message ID of an received message
-        system_status = mavlink_msg_heartbeat_get_system_status(&msg_in);   // This message was a heartbeat - record the stated system status
-        if(system_status == MAV_STATE_STANDBY) {
-          flight_controller_ready = true;
+    while(!flight_controller_ready) {
+      if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
+        if(msg_in.msgid == MAVLINK_MSG_ID_HEARTBEAT) {  // Check the message ID of an received message
+          system_status = mavlink_msg_heartbeat_get_system_status(&msg_in);   // This message was a heartbeat - record the stated system status
+          if(system_status == MAV_STATE_STANDBY) {
+            flight_controller_ready = true;
+          }
         }
       }
     }
@@ -95,6 +102,23 @@ void setup() {
     // TODO: Determine fixed dGPS location before takeoff
     //       Wait for confirmation message about fixed dGPS location before proceeding
     //       Keep the base station up to date with the status of the dGPS
+    send_msg_status("Initiating GPS data-stream...");
+    initiate_GPS_data();
+    // Wait for GPS data to arrive
+    bool GPS_data_present = false;
+    while(!GPS_data_present) {
+      if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
+        if(msg_in.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {  // Check the message ID of an received message
+          current_lat = mavlink_msg_global_position_int_get_lat(&msg_in);
+          current_lon = mavlink_msg_global_position_int_get_lon(&msg_in);
+          GPS_data_present = true;
+        }
+      }
+    }
+    send_msg_status("GPS data-stream active");
+    
+    send_msg_status("Updating home location");
+    //get_home_location();
 
     // Send a heartbeat to the base station every second (ish)
     if(base_station_active) {
@@ -134,13 +158,16 @@ void loop() {
       }
       break;
     case BEGIN_APPROACH:      // Approaching a mine
-      set_position_target(mines[mines_index].lat, mines[mines_index].lon);    // Send a message to the Pixhawk telling it to move the drone
+      target_lat = mines[mines_index].lat;
+      target_lon = mines[mines_index].lon;
+      set_position_target(target_lat, target_lon);    // Send a message to the Pixhawk telling it to move the drone
       state = APPROACHING;
       break;
     case APPROACHING:
-      // TODO
-      // if(close enough to target)
-      //   state = DROP;
+      // Remain in this case until the drone is acceptably close to the target point
+      if(dist_to(current_lat, current_lon, target_lat, target_lon) < DROP_TARGET_ERROR_MARGIN) {
+        state = DROP;
+      }
       break;
     case DROP:          //dropping the payload
       // TODO: trigger payload drop
@@ -153,16 +180,16 @@ void loop() {
       }
       else {
         // Generate a target point to escape to, and go there
-        uint32_t target_lat, target_lon;  // Make a spot in memory for the target point
         get_escape_point(&target_lat, &target_lon);   // Calculate the target lat/lon. This function will place the target values in the variables pointed to by the function arguments
         set_position_target(target_lat, target_lon);  // Send the drone to the target point
         state = ESCAPING;
       }
       break;
     case ESCAPING:
-      // TODO
-      // if(close enough to target [escape point])
-      //   state = BEGIN_APPROACH;
+      // Remain in this case until the drone is acceptable close to the target point
+      if(dist_to(current_lat, current_lon, target_lat, target_lon) < ESCAPE_TARGET_ERROR_MARGIN) {
+        state = BEGIN_APPROACH;
+      }
       break;
     case BEGIN_RETURN_HOME:   // Tells the Pixhawk to fly back to the launch point
       return_to_launch();
@@ -196,12 +223,16 @@ void loop() {
         set_command_status(&msg_in, &stat_in);
         if(command_status == REJECTED) {
           char error_msg[MAX_DATA_SIZE];
-          sprintf(error_msg, "ERROR: Flight controller rejected a command (ID#%d", mavlink_msg_command_ack_get_command(&msg_in));
+          sprintf(error_msg, "ERROR: Flight controller rejected a command (ID#%d)", mavlink_msg_command_ack_get_command(&msg_in));
           send_msg_status(error_msg);
         }
         break;
       case MAVLINK_MSG_ID_HEARTBEAT:
         last_fc_heartbeat_received = millis();
+        break;
+      case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+        current_lat = mavlink_msg_global_position_int_get_lat(&msg_in);
+        current_lon = mavlink_msg_global_position_int_get_lon(&msg_in);
         break;
     }
   }
