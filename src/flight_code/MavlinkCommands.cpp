@@ -143,6 +143,20 @@ void initiate_GPS_data() {
   send_mavlink(&msg);
 }
 
+// Sends a message to the flight controller telling it to send back the home position of the drone
+void request_home_location() {
+  mavlink_message_t msg;
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_GET_HOME_POSITION, 0, 0,0,0,0,0,0,0);  // request home position
+  send_mavlink(&msg);
+}
+
+// Sends a message to the flight controller telling it to update the home location to the present position
+void reset_home_location() {
+  mavlink_message_t msg;
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_DO_SET_HOME, 0, 1,0,0,0,0,0,0); // Set to current location
+  send_mavlink(&msg);
+}
+
 void check_timeouts() {
   int32_t cur_time = millis();
   if(command_status == SENT) {

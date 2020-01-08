@@ -18,7 +18,6 @@
 struct mine_t {
     int32_t lat;
     int32_t lon;
-    bool isDetonated;
 };
 #define MINE_T_SIZE sizeof(mine_t)
 
@@ -34,6 +33,7 @@ extern mine_t mines[MAX_NUM_MINES];
 extern uint16_t mines_index;
 extern uint16_t num_mines;
 
+void add_mine(node_t**, uint32_t, uint32_t);
 void LL_add(node_t**, mine_t*);
 void LL_remove(node_t**, mine_t*);
 bool mine_t_equals(mine_t, mine_t);

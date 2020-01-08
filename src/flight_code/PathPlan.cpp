@@ -5,6 +5,14 @@ mine_t mines[MAX_NUM_MINES];
 uint16_t mines_index = 0;
 uint16_t num_mines = 0;
 
+// Adds a mine to the linked list
+void add_mine(node_t** head_ref, uint32_t lat, uint32_t lon) {
+  struct mine_t* new_mine = (struct mine_t*)malloc(MINE_T_SIZE);  // allocate some memory for the new mine data
+  new_mine->lat = lat;
+  new_mine->lon = lon;
+  LL_add(head_ref, new_mine);  // Add the new mine to the linked list
+}
+
 void LL_add(node_t** head_ref, mine_t* mine_ptr) {
     struct node_t* new_node = (struct node_t*)malloc(NODE_T_SIZE);
     new_node->mine = mine_ptr;

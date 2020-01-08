@@ -42,85 +42,120 @@ bool in_flight = false;
 
 
 void setup() {
-  DEBUG_PORT.begin(DEBUG_BAUD);
-
-  setup_mavlink(&MAV_PORT, MAV_BAUD);   // initialize the mavlink connection
-  setup_comms(&COMMS_PORT, COMMS_BAUD); // initialize the base station connection
-
-  bool flight_controller_ready = false, minefield_data_acquired = false, dGPS_ready = false;
+  // enum for states of the setup state machine
+  enum setup_state_t { WAIT_FOR_HEARTBEAT, WAIT_FOR_MINEFIELD, WAIT_FOR_MINES, WAIT_FOR_GPS_FIX, RESET_HOME_LOCATION, START_GPS_STREAM, WAIT_FOR_GPS_STREAM, REQUEST_HOME_LOCATION, WAIT_FOR_HOME_LOCATION, PLAN_PATH } setup_state = WAIT_FOR_HEARTBEAT;
+  bool setup_complete = false;
   uint16_t num_mines_received = 0;
   node_t* head = NULL;    // head of the linked list that stores the incoming mine data
   mavlink_message_t msg_in;
   mavlink_status_t stat_in;
-  uint8_t system_status = MAV_STATE_UNINIT;   // initial flight controller state is unknown
   
-  while(!flight_controller_ready || !minefield_data_acquired || !dGPS_ready) {
-    while(COMMS_PORT.available()) {
-      if(receive_byte(&packet_in, COMMS_PORT.read())) {
-        if(packet_in.msg_type == MSG_HEARTBEAT) {
-          base_station_active = true;
-        }
-        else if(packet_in.msg_type == MSG_MINEFIELD) {
-          num_mines = parse_msg_minefield(&packet_in);
-        }
-        else if(packet_in.msg_type == MSG_MINE && !minefield_data_acquired) {
-          if(num_mines == 0) {  // We got a mine message before we were ready for it
-            send_msg_status("ERROR: Mine data received without minefield data");
+  DEBUG_PORT.begin(DEBUG_BAUD);
+  
+  setup_mavlink(&MAV_PORT, MAV_BAUD);   // initialize the mavlink connection
+  setup_comms(&COMMS_PORT, COMMS_BAUD); // initialize the base station connection
+  
+  // Ensure we have a heartbeat from the Pixhawk before continuing to the state machine
+  bool flight_controller_ready = false;
+  while(!flight_controller_ready) {
+    if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
+      if(msg_in.msgid == MAVLINK_MSG_ID_HEARTBEAT) {  // Check the message ID of an received message
+        flight_controller_ready = true;
+      }
+    }
+  }
+  
+  // Main setup state machine
+  while(!setup_complete) {
+    switch(setup_state) {
+      case WAIT_FOR_HEARTBEAT:    // Wait for a heartbeat from the base station
+        if(receive_message(&packet_in)) { // read the contents of the serial buffer looking for a message
+          if(packet_in.msg_type == MSG_HEARTBEAT) {
+            base_station_active = true;
+            send_msg_status("Drone online");
+            send_msg_status("Waiting for minefield data...");
+            setup_state = WAIT_FOR_MINEFIELD;
           }
-          else {
+        }
+        break;
+      case WAIT_FOR_MINEFIELD:    // Wait for a minefield message (tells the drone how many mines to expect
+        if(receive_message(&packet_in)) {
+          if(packet_in.msg_type == MSG_MINEFIELD) {
+            num_mines = parse_msg_minefield(&packet_in);
+            send_msg_status("General minefield info received");
+            send_msg_status("Waiting for mine locations...");
+            setup_state = WAIT_FOR_MINES;
+          }
+        }
+        break;
+      case WAIT_FOR_MINES:        // Wait for all of the mine messages to arrive from the base station
+        if(receive_message(&packet_in)) {
+          if(packet_in.msg_type == MSG_MINE) {
             uint32_t lat,lon;
             parse_msg_mine(&packet_in, &lat, &lon);
-            struct mine_t* new_mine = (struct mine_t*)malloc(MINE_T_SIZE);  // allocate some memory for the new mine data
-            new_mine->lat = lat;
-            new_mine->lon = lon;
-            new_mine->isDetonated = false;  // assume the mine is live
-            LL_add(&head, new_mine);  // Add the new mine to the linked list
+            add_mine(&head, lat, lon);
             num_mines_received++;
-            
+
             if(num_mines_received == num_mines) {
-              minefield_data_acquired = true;
-              send_msg_status("Minefield data transfer complete");
+              char status_msg[MAX_DATA_SIZE];
+              sprintf(status_msg, "Transfer complete - received data for %d mines", num_mines_received);
+              send_msg_status(status_msg);
+              send_msg_status("Waiting for GPS fix...");
+              setup_state = WAIT_FOR_GPS_FIX;
             }
           }
         }
         break;
-      }
-    }
-
-    // Ensure we have a heartbeat from the Pixhawk before continuing to the state machine
-    while(!flight_controller_ready) {
-      if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
-        if(msg_in.msgid == MAVLINK_MSG_ID_HEARTBEAT) {  // Check the message ID of an received message
-          system_status = mavlink_msg_heartbeat_get_system_status(&msg_in);   // This message was a heartbeat - record the stated system status
-          if(system_status == MAV_STATE_STANDBY) {
-            flight_controller_ready = true;
+      case WAIT_FOR_GPS_FIX:      // Wait for a good GPS fix
+        // TODO
+  //      if(GPS gets a good fix) {
+  //        send_msg_status("GPS fix acquired");
+  //        setup_state = RESET_HOME_LOCATION
+  //      }
+      case RESET_HOME_LOCATION:   // Reset the flight controller's home location to the current location
+        send_msg_status("Updating home location");
+        reset_home_location();
+        setup_state = START_GPS_STREAM;
+        break;
+      case START_GPS_STREAM:      // Initiate the stream of GPS data from the flight controller
+        send_msg_status("Initiating GPS data-stream...");
+        initiate_GPS_data();
+        setup_state = WAIT_FOR_GPS_STREAM;
+        break;
+      case WAIT_FOR_GPS_STREAM:   // Wait for the stream of GPS data to begin
+        if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
+          if(msg_in.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {  // Check the message ID of an received message
+            current_lat = mavlink_msg_global_position_int_get_lat(&msg_in);
+            current_lon = mavlink_msg_global_position_int_get_lon(&msg_in);
+            send_msg_status("GPS data-stream active");
+            setup_state = REQUEST_HOME_LOCATION;
           }
         }
-      }
-    }
-
-    // TODO: Determine fixed dGPS location before takeoff
-    //       Wait for confirmation message about fixed dGPS location before proceeding
-    //       Keep the base station up to date with the status of the dGPS
-    send_msg_status("Initiating GPS data-stream...");
-    initiate_GPS_data();
-    // Wait for GPS data to arrive
-    bool GPS_data_present = false;
-    while(!GPS_data_present) {
-      if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
-        if(msg_in.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {  // Check the message ID of an received message
-          current_lat = mavlink_msg_global_position_int_get_lat(&msg_in);
-          current_lon = mavlink_msg_global_position_int_get_lon(&msg_in);
-          GPS_data_present = true;
+        break;
+      case REQUEST_HOME_LOCATION: // Ask the flight controller for it's home location (needed for path planning)
+        send_msg_status("Updating home location...");
+        request_home_location();
+        setup_state = WAIT_FOR_HOME_LOCATION;
+        break;
+      case WAIT_FOR_HOME_LOCATION:  // Wait for the requested home location to arrive from the flight controller
+        if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
+          if(msg_in.msgid == MAVLINK_MSG_ID_HOME_POSITION) {  // Check the message ID of an received message
+            home_lat = mavlink_msg_home_position_get_latitude(&msg_in);
+            home_lon = mavlink_msg_home_position_get_longitude(&msg_in);
+            send_msg_status("Home location updated");
+            setup_state = PLAN_PATH;
+          }
         }
-      }
+        break;
+      case PLAN_PATH:             // Plan the drone's path through the minefield
+        send_msg_status("Planning flight path...");
+        plan_path(home_lat, home_lon, &head);
+        send_msg_status("Flight path planning complete");
+        setup_complete = true;    // Terminate the setup state machine
+        break;
     }
-    send_msg_status("GPS data-stream active");
     
-    send_msg_status("Updating home location");
-    //get_home_location();
-
-    // Send a heartbeat to the base station every second (ish)
+    // Once we have heard a heartbeat from the base station, begin sending back a heartbeat every second (ish)
     if(base_station_active) {
       uint32_t cur_time = millis();
       if(cur_time - last_bs_heartbeat_sent >= 1000) {
@@ -129,11 +164,6 @@ void setup() {
       }
     }
   }
-
-  // Plan the drone's path through the minefield
-  send_msg_status("Planning flight path...");
-  plan_path(home_lat, home_lon, &head);
-  send_msg_status("Flight path planning complete");
 }
 
 void loop() {

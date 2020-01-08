@@ -48,6 +48,8 @@ void takeoff(bool resend = false);
 void set_position_target(uint32_t, uint32_t);
 void return_to_launch(bool resend = false);
 void initiate_GPS_data();
+void request_home_location();
+void reset_home_location();
 void check_timeouts();
 void resend();
 
