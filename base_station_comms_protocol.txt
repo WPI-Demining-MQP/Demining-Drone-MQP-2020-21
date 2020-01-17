@@ -34,3 +34,8 @@ MSG_TAKEOFF=4
 MSG_ABORT=5
   Signal from the base station to abort the current process and return to launch
   No associated data bytes
+
+MSG_ACK=6
+  Acknowledgement packet - Confirms to the base station that a specific message type was received
+  One associated data byte:
+    Type of the message that is being acknowledged

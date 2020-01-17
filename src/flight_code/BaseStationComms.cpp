@@ -9,6 +9,9 @@ void setup_comms(HardwareSerial* serial_ptr, uint32_t comms_baud) {
 
 void send_message(uint8_t msg_type, uint8_t data_len, uint8_t* data) {
   uint8_t parity = generate_parity(data, data_len);
+  parity = accumulate_parity(parity, START_BYTE);
+  parity = accumulate_parity(parity, msg_type);
+  parity = accumulate_parity(parity, data_len);
   comms_port->write(START_BYTE);
   comms_port->write(msg_type);
   comms_port->write(data_len);
@@ -100,12 +103,17 @@ void send_msg_heartbeat() {
 }
 
 // Sends a status message containing the passed string
-void send_msg_status(const char* msg) {
+void send_msg_status(char* msg) {
   uint8_t data_len = 0;
   while(msg[data_len] != '\0') {
     data_len++;
   }
   send_message(MSG_STATUS, data_len, (uint8_t*)msg);
+}
+
+// Sends an acknowledgement message
+void send_msg_ack(uint8_t ack_type) {
+  send_message(MSG_ACK, 1, &ack_type);
 }
 
 // parses a received minefield message and returns the total number of mines that are present

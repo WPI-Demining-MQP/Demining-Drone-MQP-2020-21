@@ -16,7 +16,7 @@
 #define COMMS_PORT Serial2  // Base station comms port
 #define DEBUG_BAUD 115200
 #define MAV_BAUD   19200
-#define COMMS_BAUD 19200
+#define COMMS_BAUD 57600
 
 #define UNRESPONSIVE_SYSTEM_TIMEOUT 3000  // Maximum allowable time (in ms) without getting a heartbeat (flight controller or base station) before we raise red flags
 
@@ -85,6 +85,7 @@ void setup() {
             send_msg_status("General minefield info received");
             send_msg_status("Waiting for mine locations...");
             setup_state = WAIT_FOR_MINES;
+            send_msg_ack(MSG_MINEFIELD);
           }
         }
         break;
@@ -95,6 +96,7 @@ void setup() {
             parse_msg_mine(&packet_in, &lat, &lon);
             add_mine(&head, lat, lon);
             num_mines_received++;
+            send_msg_ack(MSG_MINE);
 
             if(num_mines_received == num_mines) {
               char status_msg[MAX_DATA_SIZE];
@@ -112,6 +114,7 @@ void setup() {
   //        send_msg_status("GPS fix acquired");
   //        setup_state = RESET_HOME_LOCATION
   //      }
+        break;
       case RESET_HOME_LOCATION:   // Reset the flight controller's home location to the current location
         send_msg_status("Updating home location");
         reset_home_location();
