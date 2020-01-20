@@ -16,16 +16,18 @@ MSG_MINEFIELD=2
 
 MSG_MINE=3
   Mine info - received from the base station. Coordinates for a single mine
-  Communicates latitude an longitude in units of deg*1.0E7 as uint32_t
-  8 data bytes:
-    1) bits 0:7 of latitude
-    2) bits 7:15 of latitude
-    3) bits 16:23 of latitude
-    4) bits 24:31 of latitude
-    5) bits 0:7 of longitude
-    6) bits 7:15 of longitude
-    7) bits 16:23 of longitude
-    8) bits 24:31 of longitude
+  Communicates a zero-indexed mine_id as uint16_t, and latitude and longitude in units of deg*1.0E7 as uint32_t
+  10 data bytes:
+    1) bits 0:7 of mine_id
+    2) bits 8:15 of mine_id
+    3) bits 0:7 of latitude
+    4) bits 7:15 of latitude
+    5) bits 16:23 of latitude
+    6) bits 24:31 of latitude
+    7) bits 0:7 of longitude
+    8) bits 7:15 of longitude
+    9) bits 16:23 of longitude
+    10) bits 24:31 of longitude
 
 MSG_TAKEOFF=4
   Signal from the base station to takeoff. Used as a trigger at the beggining of a run, or after a sandbag reload

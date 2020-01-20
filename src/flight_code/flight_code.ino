@@ -84,8 +84,8 @@ void setup() {
             num_mines = parse_msg_minefield(&packet_in);
             send_msg_status("General minefield info received");
             send_msg_status("Waiting for mine locations...");
-            setup_state = WAIT_FOR_MINES;
             send_msg_ack(MSG_MINEFIELD);
+            setup_state = WAIT_FOR_MINES;
           }
         }
         break;
@@ -93,17 +93,19 @@ void setup() {
         if(receive_message(&packet_in)) {
           if(packet_in.msg_type == MSG_MINE) {
             uint32_t lat,lon;
-            parse_msg_mine(&packet_in, &lat, &lon);
-            add_mine(&head, lat, lon);
-            num_mines_received++;
-            send_msg_ack(MSG_MINE);
-
-            if(num_mines_received == num_mines) {
-              char status_msg[MAX_DATA_SIZE];
-              sprintf(status_msg, "Transfer complete - received data for %d mines", num_mines_received);
-              send_msg_status(status_msg);
-              send_msg_status("Waiting for GPS fix...");
-              setup_state = WAIT_FOR_GPS_FIX;
+            // Each incoming mine as a zero-based index. Only accept this incoming mine if it has the correct index.
+            if(parse_msg_mine(&packet_in, &lat, &lon) == num_mines_received) {
+              add_mine(&head, lat, lon);
+              num_mines_received++;
+              send_msg_ack(MSG_MINE);
+              
+              if(num_mines_received == num_mines) {
+                char status_msg[MAX_DATA_SIZE];
+                sprintf(status_msg, "Transfer complete - received data for %d mines", num_mines_received);
+                send_msg_status(status_msg);
+                send_msg_status("Waiting for GPS fix...");
+                setup_state = WAIT_FOR_GPS_FIX;
+              }
             }
           }
         }

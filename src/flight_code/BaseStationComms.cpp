@@ -103,12 +103,10 @@ void send_msg_heartbeat() {
 }
 
 // Sends a status message containing the passed string
-void send_msg_status(char* msg) {
-  uint8_t data_len = 0;
-  while(msg[data_len] != '\0') {
-    data_len++;
-  }
-  send_message(MSG_STATUS, data_len, (uint8_t*)msg);
+void send_msg_status(const char* msg) {
+  static char output_buffer[MAX_DATA_SIZE];
+  uint8_t data_len = sprintf(output_buffer, "%s", msg);
+  send_message(MSG_STATUS, data_len, (uint8_t*)output_buffer);
 }
 
 // Sends an acknowledgement message
@@ -121,8 +119,9 @@ uint16_t parse_msg_minefield(packet_t* packet) {
   return(*(uint16_t*)(packet->data));
 }
 
-// parses the lat/lon of a single mine
-void parse_msg_mine(packet_t* packet, uint32_t* lat_ptr, uint32_t* lon_ptr) {
-  *lat_ptr = *((uint32_t*)(packet->data));
-  *lon_ptr = *((uint32_t*)((packet->data) + 4));
+// parses the lat/lon of a single mine, return the ID of the parsed mine
+uint16_t parse_msg_mine(packet_t* packet, uint32_t* lat_ptr, uint32_t* lon_ptr) {
+  *lat_ptr = *((uint32_t*)((packet->data) + 2));  // grab bytes 2,3,4,5, cast them to a single uint32_t
+  *lon_ptr = *((uint32_t*)((packet->data) + 6));  // grab bytes 6,7,8,9, cast them to a single uint32_t
+  return(*(uint16_t*)(packet->data));             // grab bytes 0,1, cast them to a single uint16_t
 }
