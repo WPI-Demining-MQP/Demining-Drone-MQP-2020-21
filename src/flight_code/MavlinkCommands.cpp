@@ -137,48 +137,91 @@ void return_to_launch(bool resend) {
 }
 
 // Sends a message to the flight controller telling it to send a position estimate every 1 second
-void initiate_GPS_data() {
+void initiate_GPS_data(bool resend) {
   mavlink_message_t msg;
-  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_SET_MESSAGE_INTERVAL, 0, MAVLINK_MSG_ID_GLOBAL_POSITION_INT, 1000000,0,0,0,0,0);  // request GLOBAL_POSITION_INT at 1 Hz
+  static uint8_t confirmation = 0;
+  if(resend == true)
+    confirmation++;
+  else
+    confirmation = 0;
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_SET_MESSAGE_INTERVAL, confirmation, MAVLINK_MSG_ID_GLOBAL_POSITION_INT, 1000000,0,0,0,0,0);  // request GLOBAL_POSITION_INT at 1 Hz
   send_mavlink(&msg);
+  cmd_last_sent_time = millis();
+  cmd_last_sent_type = MAV_CMD_SET_MESSAGE_INTERVAL;
+  cmd_last_sent_param = MAVLINK_MSG_ID_GLOBAL_POSITION_INT;
+  command_status = SENT;
 }
 
 // Sends a message to the flight controller telling it to send back the home position of the drone
-void request_home_location() {
+void request_home_location(bool resend) {
   mavlink_message_t msg;
-  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_GET_HOME_POSITION, 0, 0,0,0,0,0,0,0);  // request home position
+  static uint8_t confirmation = 0;
+  if(resend == true)
+    confirmation++;
+  else
+    confirmation = 0;
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_GET_HOME_POSITION, confirmation, 0,0,0,0,0,0,0);  // request home position
   send_mavlink(&msg);
+  cmd_last_sent_time = millis();
+  cmd_last_sent_type = MAV_CMD_GET_HOME_POSITION;
+  command_status = SENT;
 }
 
 // Sends a message to the flight controller telling it to update the home location to the present position
-void reset_home_location() {
+void reset_home_location(bool resend) {
   mavlink_message_t msg;
-  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_DO_SET_HOME, 0, 1,0,0,0,0,0,0); // Set to current location
+  static uint8_t confirmation = 0;
+  if(resend == true)
+    confirmation++;
+  else
+    confirmation = 0;
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_DO_SET_HOME, confirmation, 1,0,0,0,0,0,0); // Set to current location
   send_mavlink(&msg);
+  cmd_last_sent_time = millis();
+  cmd_last_sent_type = MAV_CMD_DO_SET_HOME;
+  command_status = SENT;
 }
 
-void check_timeouts() {
+// returns false if no action was taken, or true if a message was resent
+bool check_timeouts() {
   int32_t cur_time = millis();
   if(command_status == SENT) {
     if(cur_time - cmd_last_sent_time >= NO_ACK_TIMEOUT) {
       resend();  // if the command has not been acknowledged, resend it
+      return true;
     }
   }
+  return false;
 }
 
 void resend() {
-  if(cmd_last_sent_type == MAV_CMD_NAV_TAKEOFF) {
-    takeoff(true);
-  }
-  else if(cmd_last_sent_type == MAV_CMD_COMPONENT_ARM_DISARM) {
-    if(cmd_last_sent_param == ARM_CONDITION) {
-      arm(true);
-    }
-    else if(cmd_last_sent_param == DISARM_CONDITION) {
-      disarm(true);
-    }
-  }
-  else if(cmd_last_sent_type == MAV_CMD_NAV_RETURN_TO_LAUNCH) {
-    return_to_launch(true);
+  switch(cmd_last_sent_type) {
+    case MAV_CMD_NAV_TAKEOFF:
+      takeoff(true);
+      break;
+    case MAV_CMD_COMPONENT_ARM_DISARM:
+      if(cmd_last_sent_param == ARM_CONDITION) {
+        arm(true);
+      }
+      else if(cmd_last_sent_param == DISARM_CONDITION) {
+        disarm(true);
+      }
+      break;
+    case MAV_CMD_NAV_RETURN_TO_LAUNCH:
+      return_to_launch(true);
+      break;
+    case MAV_CMD_SET_MESSAGE_INTERVAL:
+      if(cmd_last_sent_param == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+        initiate_GPS_data(true);
+      }
+      break;
+    case MAV_CMD_GET_HOME_POSITION:
+      request_home_location(true);
+      break;
+    case MAV_CMD_DO_SET_HOME:
+      reset_home_location(true);
+      break;
+    default:
+      break;
   }
 }

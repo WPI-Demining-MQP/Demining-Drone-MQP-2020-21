@@ -1,6 +1,7 @@
 #include "BaseStationComms.h"
 
 HardwareSerial* comms_port = &Serial2;  // pointer to the Serial port to be used by the base station comms - defaults to Serial2
+enum system_state_t system_state = SYS_STATE_UNINIT;       // Global system state (reported to base station via heartbeat messages)
 
 void setup_comms(HardwareSerial* serial_ptr, uint32_t comms_baud) {
   comms_port = serial_ptr;
@@ -64,6 +65,10 @@ bool receive_byte(packet_t* packet_ptr, uint8_t c) {
       break;
     case PARSE_TYPE:   // receiving the message type byte
       received_packet.msg_type = c;
+      if(received_packet.msg_type >= INVALID_MSG_TYPE_CUTOFF) {
+        parse_status = PARSE_IDLE;
+        break;
+      }
       received_parity = accumulate_parity(received_parity, c);
       parse_status = PARSE_LEN;
       break;
@@ -99,7 +104,7 @@ bool receive_byte(packet_t* packet_ptr, uint8_t c) {
 
 // Sends a heartbeat message to the base station
 void send_msg_heartbeat() {
-  send_message(MSG_HEARTBEAT, 0, NULL);
+  send_message(MSG_HEARTBEAT, 1, (uint8_t*)(&system_state));
 }
 
 // Sends a status message containing the passed string

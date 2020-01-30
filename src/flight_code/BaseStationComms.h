@@ -32,6 +32,15 @@ enum message_types { MSG_HEARTBEAT=0,   // Heartbeat - sent to and received from
                      MSG_ABORT=5,       // Signal from the base station to abort the current process and return to launch
                      MSG_ACK=6          // Acknowledgement packet - Confirms to the base station that a specific message type was received
 };
+#define INVALID_MSG_TYPE_CUTOFF 7       // Any message type >= 7 is considered invalid
+
+enum system_state_t { SYS_STATE_UNINIT, // System uninitialized/state is unknown
+                      SYS_STATE_SETUP,  // System is initializing
+                      SYS_STATE_STANDBY,// System is ready for flight
+                      SYS_STATE_ACTIVE, // System is in armed and in flight
+                      SYS_STATE_EMERGENCY // System is in an emergency state (i.e. aborting the mission)
+};
+extern enum system_state_t system_state;
 
 enum parse_status_t { PARSE_UNINIT, PARSE_IDLE, PARSE_TYPE, PARSE_LEN, PARSE_DATA, PARSE_PARITY };
 

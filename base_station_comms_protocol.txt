@@ -2,7 +2,13 @@ Message Details
 
 MSG_HEARTBEAT=0
   Heartbeat - sent to and received from the base station
-  No associated data bytes
+  1 associated data byte: system status
+  System Status enum:
+    SYS_STATE_UNINIT    // System uninitialized/state is unknown
+    SYS_STATE_SETUP     // System is initializing
+    SYS_STATE_STANDBY   // System is ready for flight
+    SYS_STATE_ACTIVE    // System is in armed and in flight
+    SYS_STATE_EMERGENCY // System is in an emergency state (i.e. aborting the mission)
 
 MSG_STATUS=1
   Status message - sending a string to the base station to update the user and debug
