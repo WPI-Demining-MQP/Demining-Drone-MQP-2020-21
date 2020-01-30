@@ -252,12 +252,12 @@ void loop() {
       state = WAIT_FOR_ARM;
       break;
     case WAIT_FOR_ARM:
-      if(command_status == ACCEPTED && cmd_last_sent_type == MAV_CMD_COMPONENT_ARM_DISARM && cmd_last_sent_param == ARM_CONDITION) {
+      if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
         send_msg_status("Arm command accepted");
         command_status = COMPLETED;
         state = BEGIN_TAKEOFF;
       }
-      else if(command_status == REJECTED && cmd_last_sent_type == MAV_CMD_COMPONENT_ARM_DISARM && cmd_last_sent_param == ARM_CONDITION) {
+      else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
         send_msg_status("Arm command rejected");
         command_status = COMPLETED;
         state = DISARMED;
@@ -270,16 +270,17 @@ void loop() {
       break;
     case TAKING_OFF:       // Actively taking off
       // listen for ACK response, and wait until complete
-      if(command_status == ACCEPTED && cmd_last_sent_type == MAV_CMD_NAV_TAKEOFF) {
+      if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_NAV_TAKEOFF) {
         send_msg_status("Takeoff command accepted");
         // takeoff complete, move on to mine approach
         command_status = COMPLETED; // Mark it as taken care of
         state = BEGIN_APPROACH;
       }
-      else if(command_status == REJECTED && cmd_last_sent_type == MAV_CMD_NAV_TAKEOFF) {
+      else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_NAV_TAKEOFF) {
         send_msg_status("Takeoff command rejected");
         // takeoff complete, move on to mine approach
         command_status = COMPLETED; // Mark it as taken care of
+        in_flight = false;
         state = DISARMED;
       }
       break;
@@ -325,7 +326,7 @@ void loop() {
       state = RETURNING_HOME;
       break;
     case RETURNING_HOME:      // Drone is in the process of flying back to the launch point
-      if(command_status == ACCEPTED && cmd_last_sent_type == MAV_CMD_NAV_RETURN_TO_LAUNCH) {
+      if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_NAV_RETURN_TO_LAUNCH) {
         command_status = COMPLETED;
         state = BEGIN_DISARM;
       }
@@ -336,7 +337,7 @@ void loop() {
       state = WAIT_FOR_DISARM;
       break;
     case WAIT_FOR_DISARM:     // Waits for an acknowledgement of the disarm command
-      if(command_status == ACCEPTED && cmd_last_sent_type == MAV_CMD_COMPONENT_ARM_DISARM && cmd_last_sent_param == DISARM_CONDITION) {
+      if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
         send_msg_status("Disarm command accepted");
         
         if(mines_index == num_mines)
@@ -347,7 +348,7 @@ void loop() {
         in_flight = false;
         command_status = COMPLETED;
       }
-      else if(command_status == REJECTED && cmd_last_sent_type == MAV_CMD_COMPONENT_ARM_DISARM && cmd_last_sent_param == DISARM_CONDITION) {
+      else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
         send_msg_status("Disarm command rejected");
         command_status = COMPLETED;
       }
@@ -369,7 +370,8 @@ void loop() {
     send_msg_status(message);
     switch(msg_in.msgid) {
       case MAVLINK_MSG_ID_COMMAND_ACK:
-        sprintf(message, "FC_MSG_ACK#%d, result=%d", mavlink_msg_command_ack_get_command(&msg_in), mavlink_msg_command_ack_get_result(&msg_in));
+        cmd_last_ack = mavlink_msg_command_ack_get_command(&msg_in);
+        sprintf(message, "FC_MSG_ACK#%d, result=%d", cmd_last_ack, mavlink_msg_command_ack_get_result(&msg_in));
         send_msg_status(message);
         set_command_status(&msg_in, &stat_in);
         if(command_status == REJECTED) {

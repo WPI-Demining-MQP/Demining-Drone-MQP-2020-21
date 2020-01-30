@@ -10,6 +10,7 @@ enum command_status_t command_status;
 int32_t cmd_last_sent_time = -1;  // time since last command was sent
 MAV_CMD cmd_last_sent_type;       // type of the last command sent
 float cmd_last_sent_param;        // parameter of the last command sent
+uint16_t cmd_last_ack = 0;       // type of the last command that was acknowledged
 
 void setup_mavlink(HardwareSerial *serial_ptr, uint32_t mav_baud) {
   mav_port = serial_ptr;
