@@ -116,7 +116,7 @@ void takeoff(bool resend) {
 }
 
 // Sets a target position for the drone to fly to
-void set_position_target(uint32_t target_lat, uint32_t target_lon) {
+void set_position_target(int32_t target_lat, int32_t target_lon) {
   mavlink_message_t msg;
   mavlink_msg_set_position_target_global_int_pack(SYS_ID, COMP_ID, &msg, millis(), TARGET_SYS, TARGET_COMP, MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, SET_POS_TYPE_MASK, target_lat, target_lon, OPERATING_ALT, 0,0,0, 0,0,0, 0,0);
   send_mavlink(&msg);

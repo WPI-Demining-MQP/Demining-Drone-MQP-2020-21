@@ -46,7 +46,7 @@ void set_command_status(mavlink_message_t*, mavlink_status_t*);
 void arm(bool resend = false);
 void disarm(bool resend = false);
 void takeoff(bool resend = false);
-void set_position_target(uint32_t, uint32_t);
+void set_position_target(int32_t, int32_t);
 void return_to_launch(bool resend = false);
 void initiate_GPS_data(bool resend = false);
 void request_home_location(bool resend = false);
