@@ -2,6 +2,7 @@
 #define BASESTATIONCOMMS_H
 
 #include <Arduino.h>
+#include "Minefield.h"
 
 #define START_BYTE 0xFD
 #define MAX_DATA_SIZE 128 // Maximum number of bytes that can be transmitted in the data field of a message
@@ -51,10 +52,10 @@ uint8_t accumulate_parity(uint8_t, uint8_t);
 bool receive_message(packet_t*);
 bool receive_byte(packet_t*, uint8_t);
 
-void send_msg_heartbeat();                // Sends a heartbeat message to the base station
-void send_msg_status(const char*);              // Sends a status message containing the passed string
-void send_msg_ack(uint8_t);               // Sends an acknowledgement message
-uint16_t parse_msg_minefield(packet_t*);  // parses a received minefield message and returns the total number of mines that are present
-uint16_t parse_msg_mine(packet_t*, int32_t*, int32_t*, int32_t*, int32_t*);  // parses the lat/lon of a single mine, return the ID of the parsed mine
+void send_msg_heartbeat();                    // Sends a heartbeat message to the base station
+void send_msg_status(const char               // Sends a status message containing the passed string
+void send_msg_ack(uint8_t);                   // Sends an acknowledgement message
+uint16_t parse_msg_minefield(packet_t*);      // parses a received minefield message and returns the total number of mines that are present
+uint16_t parse_msg_mine(packet_t*, mine_t*);  // parses the lat/lon of a single mine, return the ID of the parsed mine
 
 #endif
