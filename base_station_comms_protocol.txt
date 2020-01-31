@@ -21,9 +21,10 @@ MSG_MINEFIELD=2
     2) most significant byte of mine count (bits 8:15)
 
 MSG_MINE=3
-  Mine info - received from the base station. Coordinates for a single mine
-  Communicates a zero-indexed mine_id as uint16_t, and latitude and longitude in units of deg*1.0E7 as uint32_t
-  10 data bytes:
+  Mine info - received from the base station. Coordinates for a single mine, along with the location for the drone to escape to once the payload is dropped
+  A sequence of mine messages fully defines the flight path of the drone
+  Communicates a zero-indexed mine_id as uint16_t, and latitude and longitude values in units of deg*1.0E7 as int32_t
+  18 data bytes:
     1) bits 0:7 of mine_id
     2) bits 8:15 of mine_id
     3) bits 0:7 of latitude
@@ -34,6 +35,14 @@ MSG_MINE=3
     8) bits 7:15 of longitude
     9) bits 16:23 of longitude
     10) bits 24:31 of longitude
+    11) bits 0:7 of escape latitude
+    12) bits 7:15 of escape latitude
+    13) bits 16:23 of escape latitude
+    14) bits 24:31 of escape latitude
+    15) bits 0:7 of escape longitude
+    16) bits 7:15 of escape longitude
+    17) bits 16:23 of escape longitude
+    18) bits 24:31 of escape longitude
 
 MSG_TAKEOFF=4
   Signal from the base station to takeoff. Used as a trigger at the beggining of a run, or after a sandbag reload
