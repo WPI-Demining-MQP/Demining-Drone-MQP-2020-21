@@ -53,7 +53,7 @@ bool receive_message(packet_t*);
 bool receive_byte(packet_t*, uint8_t);
 
 void send_msg_heartbeat();                    // Sends a heartbeat message to the base station
-void send_msg_status(const char               // Sends a status message containing the passed string
+void send_msg_status(const char*);            // Sends a status message containing the passed string
 void send_msg_ack(uint8_t);                   // Sends an acknowledgement message
 uint16_t parse_msg_minefield(packet_t*);      // parses a received minefield message and returns the total number of mines that are present
 uint16_t parse_msg_mine(packet_t*, mine_t*);  // parses the lat/lon of a single mine, return the ID of the parsed mine

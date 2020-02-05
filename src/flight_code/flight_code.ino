@@ -115,8 +115,12 @@ void setup() {
         setup_state = WAIT_FOR_RESET_HOME_ACK;
         break;
       case WAIT_FOR_RESET_HOME_ACK: // Wait for the flight controller to acknowledge the reset of the home location
-        //if(command_status == COMPLETED) {
+        //if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_DO_SET_HOME) {
+          send_msg_status("Home location reset");
           setup_state = START_GPS_STREAM;
+        //}
+        //else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_DO_SET_HOME) {
+        //  send_msg_status("Home location reset was rejected");
         //}
         break;
       case START_GPS_STREAM:      // Initiate the stream of GPS data from the flight controller
@@ -136,10 +140,10 @@ void setup() {
         setup_state = WAIT_FOR_HOME_LOCATION;
         break;
       case WAIT_FOR_HOME_LOCATION:  // Wait for the requested home location to arrive from the flight controller
-        //if(home_location_updated) {
+        if(home_location_updated) {
           send_msg_status("Home location updated");
         setup_complete = true;    // Terminate the setup state machine
-        //}
+        }
         break;
     }
     
@@ -203,6 +207,7 @@ void setup() {
         case MAVLINK_MSG_ID_STATUSTEXT:
           char text[51];
           mavlink_msg_statustext_get_text(&msg_in, text);
+          send_msg_status(text);
           break;
         case MAVLINK_MSG_ID_PARAM_VALUE:
           char param_id[17];
