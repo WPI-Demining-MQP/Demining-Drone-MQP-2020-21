@@ -46,7 +46,7 @@ uint32_t last_error_print_time = 0;
 
 void setup() {
   // enum for states of the setup state machine
-  enum setup_state_t { START_GPS_FIX_STREAM, WAIT_FOR_GPS_FIX_DATA, WAIT_FOR_GPS_FIX, RESET_HOME_LOCATION, WAIT_FOR_RESET_HOME_ACK, START_GPS_STREAM, WAIT_FOR_GPS_STREAM, REQUEST_HOME_LOCATION, WAIT_FOR_HOME_LOCATION, SEND_HOME_LOCATION, WAIT_FOR_MINEFIELD, WAIT_FOR_MINES } setup_state = START_GPS_FIX_STREAM;
+  enum setup_state_t { START_GPS_FIX_STREAM, WAIT_FOR_GPS_FIX_DATA, WAIT_FOR_GPS_FIX, RESET_HOME_LOCATION, WAIT_FOR_RESET_HOME_ACK, START_GPS_STREAM, WAIT_FOR_GPS_STREAM, REQUEST_HOME_LOCATION, WAIT_FOR_HOME_LOCATION, SEND_HOME_LOCATION, WAIT_FOR_MINEFIELD, WAIT_FOR_MINES, ERROR_LOITER } setup_state = START_GPS_FIX_STREAM;
   bool setup_complete = false;
   bool GPS_position_received = false, fix_stream_active = false, home_location_updated = false;
   uint16_t num_mines_received = 0;
@@ -116,8 +116,9 @@ void setup() {
           setup_state = START_GPS_STREAM;
         }
         else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_DO_SET_HOME) {
+          command_status = COMPLETED;
           send_msg_status("Home location reset was rejected");
-          setup_state = RESET_HOME_LOCATION;
+          setup_state = ERROR_LOITER;
         }
         break;
       case START_GPS_STREAM:      // Initiate the stream of GPS data from the flight controller
@@ -162,6 +163,8 @@ void setup() {
           setup_complete = true;
         }
         break;
+      case ERROR_LOITER:
+        break;
     }
     
     // Send a heartbeat to the base station every second (ish)
@@ -199,9 +202,9 @@ void setup() {
     mavlink_message_t msg_in;
     mavlink_status_t stat_in;
     if(receive_mavlink(&msg_in, &stat_in)) {
-      char message[128];
-      sprintf(message, "FC_MSG#%d", msg_in.msgid);
-      send_msg_status(message);
+//      char message[128];
+//      sprintf(message, "FC_MSG#%d", msg_in.msgid);
+//      send_msg_status(message);
       switch(msg_in.msgid) {
         case MAVLINK_MSG_ID_COMMAND_ACK:
           char msg[128];
@@ -391,8 +394,8 @@ void loop() {
   mavlink_status_t stat_in;
   if(receive_mavlink(&msg_in, &stat_in)) {
     char message[128];
-    sprintf(message, "FC_MSG#%d", msg_in.msgid);
-    send_msg_status(message);
+//    sprintf(message, "FC_MSG#%d", msg_in.msgid);
+//    send_msg_status(message);
     switch(msg_in.msgid) {
       case MAVLINK_MSG_ID_COMMAND_ACK:
         cmd_last_ack = mavlink_msg_command_ack_get_command(&msg_in);
@@ -429,9 +432,11 @@ void loop() {
         last_bs_heartbeat_received = cur_time;
         break;
       case MSG_TAKEOFF:
+        send_msg_ack(MSG_TAKEOFF);
         in_flight = true;
         break;
       case MSG_ABORT:
+        send_msg_ack(MSG_TAKEOFF);
         state = ABORT;  // If we get an abort message, stop the current process and go to the abort case
     }
   }
