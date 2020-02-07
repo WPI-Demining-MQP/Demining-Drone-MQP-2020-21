@@ -49,6 +49,7 @@ void takeoff(bool resend = false);
 void set_position_target(int32_t, int32_t);
 void return_to_launch(bool resend = false);
 void initiate_GPS_data(bool resend = false);
+void initiate_GPS_fix_data(bool resend = false);
 void request_home_location(bool resend = false);
 void reset_home_location(bool resend = false);
 bool check_timeouts();

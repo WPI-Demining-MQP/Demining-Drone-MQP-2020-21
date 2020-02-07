@@ -18,6 +18,7 @@
 #define MAV_BAUD   19200
 #define COMMS_BAUD 57600
 
+#define OK_FIX_TYPE GPS_FIX_TYPE_DGPS  // Acceptable GPS fix type
 #define UNRESPONSIVE_SYSTEM_TIMEOUT 5000  // Maximum allowable time (in ms) without getting a heartbeat (flight controller or base station) before we raise red flags
 
 #define DROP_TARGET_ERROR_MARGIN 0.05     // Minimum acceptable error (in meters) from the target point when the drone is about to drop a payload
@@ -26,7 +27,8 @@
 // Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
 int32_t home_lat = 422756340, home_lon = -718030810;
 int32_t current_lat, current_lon;   // Current lat/lon of the drone
-int32_t target_lat, target_lon;    // Target lat/lon for each movement
+int32_t target_lat, target_lon;     // Target lat/lon for each movement
+uint8_t fix_status = GPS_FIX_TYPE_NO_FIX; // GPS fix type - uses Mavlink's GPS_FIX_TYPE enum
 
 uint32_t last_fc_heartbeat_received = 0;    // Time that the last heartbeat message was received from the flight controller
 uint32_t last_bs_heartbeat_received = 0;    // Time that the last heartbeat message was received from the base station
@@ -39,13 +41,14 @@ enum state_t {DISARMED, BEGIN_ARM, WAIT_FOR_ARM, BEGIN_TAKEOFF, TAKING_OFF, BEGI
 packet_t packet_in; // Global packet to use for incoming data from the base station
 bool base_station_active = false; // Global to keep track of whether the base station is sending messages or not
 bool in_flight = false;
+uint32_t last_error_print_time = 0;
 
 
 void setup() {
   // enum for states of the setup state machine
-  enum setup_state_t { WAIT_FOR_MINEFIELD, WAIT_FOR_MINES, WAIT_FOR_GPS_FIX, RESET_HOME_LOCATION, WAIT_FOR_RESET_HOME_ACK, START_GPS_STREAM, WAIT_FOR_GPS_STREAM, REQUEST_HOME_LOCATION, WAIT_FOR_HOME_LOCATION } setup_state = WAIT_FOR_MINEFIELD;
+  enum setup_state_t { START_GPS_FIX_STREAM, WAIT_FOR_GPS_FIX_DATA, WAIT_FOR_GPS_FIX, RESET_HOME_LOCATION, WAIT_FOR_RESET_HOME_ACK, START_GPS_STREAM, WAIT_FOR_GPS_STREAM, REQUEST_HOME_LOCATION, WAIT_FOR_HOME_LOCATION, SEND_HOME_LOCATION, WAIT_FOR_MINEFIELD, WAIT_FOR_MINES } setup_state = START_GPS_FIX_STREAM;
   bool setup_complete = false;
-  bool GPS_position_received = false, home_location_updated = false;
+  bool GPS_position_received = false, fix_stream_active = false, home_location_updated = false;
   uint16_t num_mines_received = 0;
   mavlink_message_t msg_in;
   mavlink_status_t stat_in;
@@ -79,35 +82,27 @@ void setup() {
       }
     }
   }
-  
-  send_msg_status("Waiting for minefield data...");
 
   system_state = SYS_STATE_SETUP;
   // Main setup state machine
   while(!setup_complete) {
     switch(setup_state) {
-      case WAIT_FOR_MINEFIELD:    // Wait for a minefield message (tells the drone how many mines to expect
-        // num_mines is initialized to 0
-        // When a minefield message is received, it's value is updated
-        if(num_mines) {
-          setup_state = WAIT_FOR_MINES;
-        }
+      case START_GPS_FIX_STREAM:
+        send_msg_status("Initiating GPS fix data-stream...");
+        initiate_GPS_fix_data();
+        setup_state = WAIT_FOR_GPS_FIX_DATA;
         break;
-      case WAIT_FOR_MINES:        // Wait for all of the mine messages to arrive from the base station
-        if(num_mines_received == num_mines) {
-          char status_msg[MAX_DATA_SIZE];
-          sprintf(status_msg, "Transfer complete - received data for %d mines", num_mines_received);
-          send_msg_status(status_msg);
-          send_msg_status("Waiting for GPS fix...");
+      case WAIT_FOR_GPS_FIX_DATA:
+        if(fix_stream_active) {
+          send_msg_status("GPS fix data-stream active");
+          send_msg_status("Waiting for GPS fix (this may take a few minutes)...");
           setup_state = WAIT_FOR_GPS_FIX;
         }
-        break;
       case WAIT_FOR_GPS_FIX:      // Wait for a good GPS fix
-        // TODO
-  //      if(GPS gets a good fix) {
-  //        send_msg_status("GPS fix acquired");
+        if(fix_status >= OK_FIX_TYPE && fix_status <= GPS_FIX_TYPE_RTK_FIXED) {
+          send_msg_status("GPS fix acquired");
           setup_state = RESET_HOME_LOCATION;
-  //      }
+        }
         break;
       case RESET_HOME_LOCATION:   // Reset the flight controller's home location to the current location
         send_msg_status("Resetting home location");
@@ -115,13 +110,15 @@ void setup() {
         setup_state = WAIT_FOR_RESET_HOME_ACK;
         break;
       case WAIT_FOR_RESET_HOME_ACK: // Wait for the flight controller to acknowledge the reset of the home location
-        //if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_DO_SET_HOME) {
+        if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_DO_SET_HOME) {
+          command_status = COMPLETED;
           send_msg_status("Home location reset");
           setup_state = START_GPS_STREAM;
-        //}
-        //else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_DO_SET_HOME) {
-        //  send_msg_status("Home location reset was rejected");
-        //}
+        }
+        else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_DO_SET_HOME) {
+          send_msg_status("Home location reset was rejected");
+          setup_state = RESET_HOME_LOCATION;
+        }
         break;
       case START_GPS_STREAM:      // Initiate the stream of GPS data from the flight controller
         send_msg_status("Initiating GPS data-stream...");
@@ -142,7 +139,27 @@ void setup() {
       case WAIT_FOR_HOME_LOCATION:  // Wait for the requested home location to arrive from the flight controller
         if(home_location_updated) {
           send_msg_status("Home location updated");
-        setup_complete = true;    // Terminate the setup state machine
+          setup_state = SEND_HOME_LOCATION;
+        }
+        break;
+      case SEND_HOME_LOCATION:    // Send the newly updated home location back to the base station for path planning
+        send_msg_status("Sending home location");
+        send_msg_home(home_lat, home_lon);
+        setup_state = WAIT_FOR_MINEFIELD;
+        break;
+      case WAIT_FOR_MINEFIELD:    // Wait for a minefield message (tells the drone how many mines to expect
+        // num_mines is initialized to 0
+        // When a minefield message is received, it's value is updated
+        if(num_mines) {
+          setup_state = WAIT_FOR_MINES;
+        }
+        break;
+      case WAIT_FOR_MINES:        // Wait for all of the mine messages to arrive from the base station
+        if(num_mines_received == num_mines) {
+          char status_msg[MAX_DATA_SIZE];
+          sprintf(status_msg, "Transfer complete - received data for %d mines", num_mines_received);
+          send_msg_status(status_msg);
+          setup_complete = true;
         }
         break;
     }
@@ -182,8 +199,15 @@ void setup() {
     mavlink_message_t msg_in;
     mavlink_status_t stat_in;
     if(receive_mavlink(&msg_in, &stat_in)) {
+      char message[128];
+      sprintf(message, "FC_MSG#%d", msg_in.msgid);
+      send_msg_status(message);
       switch(msg_in.msgid) {
         case MAVLINK_MSG_ID_COMMAND_ACK:
+          char msg[128];
+          sprintf(msg, "ACK (ID#%d) result=%d", mavlink_msg_command_ack_get_command(&msg_in), mavlink_msg_command_ack_get_result(&msg_in));
+          send_msg_status(msg);
+          cmd_last_ack = mavlink_msg_command_ack_get_command(&msg_in);
           set_command_status(&msg_in, &stat_in);
           if(command_status == REJECTED) {
             char error_msg[MAX_DATA_SIZE];
@@ -213,12 +237,19 @@ void setup() {
           char param_id[17];
           mavlink_msg_param_value_get_param_id(&msg_in, param_id);
           break;
+        case MAVLINK_MSG_ID_GPS_RAW_INT:
+          fix_status = mavlink_msg_gps_raw_int_get_fix_type(&msg_in);
+          fix_stream_active = true;
+          break;
       }
     }
 
     if((cur_time - last_fc_heartbeat_received) > UNRESPONSIVE_SYSTEM_TIMEOUT) {
       // It's been too long since the Pixhawk has sent a heartbeat - something has gone wrong
-      send_msg_status("ERROR: flight controller is unresponsive");
+      if(millis() - last_error_print_time > 1000) {
+        send_msg_status("ERROR: flight controller is unresponsive");
+        last_error_print_time = millis();
+      }
     }
     if((cur_time - last_bs_heartbeat_received) > UNRESPONSIVE_SYSTEM_TIMEOUT) {
       // It's been too long since the base station has sent a heartbeat - something has gone wrong
@@ -413,7 +444,10 @@ void loop() {
   
   if(cur_time - last_fc_heartbeat_received > UNRESPONSIVE_SYSTEM_TIMEOUT) {
     // It's been too long since the Pixhawk has sent a heartbeat - something has gone wrong
-    send_msg_status("ERROR: flight controller is unresponsive");
+    if(millis() - last_error_print_time > 1000) {
+      send_msg_status("ERROR: flight controller is unresponsive");
+      last_error_print_time = millis();
+    }
   }
   if(cur_time - last_bs_heartbeat_received > UNRESPONSIVE_SYSTEM_TIMEOUT) {
     // It's been too long since the base station has sent a heartbeat - something has gone wrong

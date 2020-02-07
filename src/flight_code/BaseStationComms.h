@@ -31,7 +31,8 @@ enum message_types { MSG_HEARTBEAT=0,   // Heartbeat - sent to and received from
                      MSG_MINE=3,        // Mine info - received from the base station. Coordinates for a single mine
                      MSG_TAKEOFF=4,     // Signal from the base station to takeoff. Used as a trigger at the beggining of a run, or after a sandbag reload
                      MSG_ABORT=5,       // Signal from the base station to abort the current process and return to launch
-                     MSG_ACK=6          // Acknowledgement packet - Confirms to the base station that a specific message type was received
+                     MSG_ACK=6,         // Acknowledgement packet - Confirms to the base station that a specific message type was received
+                     MSG_HOME=7         // Home location - Passes the home location of the drone back to the base station for path planning
 };
 #define INVALID_MSG_TYPE_CUTOFF 7       // Any message type >= 7 is considered invalid
 
@@ -55,6 +56,7 @@ bool receive_byte(packet_t*, uint8_t);
 void send_msg_heartbeat();                    // Sends a heartbeat message to the base station
 void send_msg_status(const char*);            // Sends a status message containing the passed string
 void send_msg_ack(uint8_t);                   // Sends an acknowledgement message
+void send_msg_home(int32_t, int32_t);         // Sends the home location to the base stataion
 uint16_t parse_msg_minefield(packet_t*);      // parses a received minefield message and returns the total number of mines that are present
 uint16_t parse_msg_mine(packet_t*, mine_t*);  // parses the lat/lon of a single mine, return the ID of the parsed mine
 

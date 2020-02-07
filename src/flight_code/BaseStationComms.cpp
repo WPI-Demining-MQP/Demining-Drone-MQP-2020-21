@@ -119,6 +119,20 @@ void send_msg_ack(uint8_t ack_type) {
   send_message(MSG_ACK, 1, &ack_type);
 }
 
+// Sends the home location to the base stataion
+void send_msg_home(int32_t lat, int32_t lon) {
+  uint8_t data[8];
+  data[0] = (uint8_t)lat;
+  data[1] = (uint8_t)(lat >> 8);
+  data[2] = (uint8_t)(lat >> 16);
+  data[3] = (uint8_t)(lat >> 24);
+  data[4] = (uint8_t)lon;
+  data[5] = (uint8_t)(lon >> 8);
+  data[6] = (uint8_t)(lon >> 16);
+  data[7] = (uint8_t)(lon >> 24);
+  send_message(MSG_HOME, 8, data);
+}
+
 // parses a received minefield message and returns the total number of mines that are present
 uint16_t parse_msg_minefield(packet_t* packet) {
   return(*(uint16_t*)(packet->data));
