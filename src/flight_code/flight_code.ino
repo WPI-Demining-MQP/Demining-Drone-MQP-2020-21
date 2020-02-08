@@ -27,8 +27,10 @@
 // Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
 int32_t home_lat = 422756340, home_lon = -718030810;
 int32_t current_lat, current_lon;   // Current lat/lon of the drone
+int32_t current_relative_alt;       // Current altitude relative to takeoff point
 int32_t target_lat, target_lon;     // Target lat/lon for each movement
 uint8_t fix_status = GPS_FIX_TYPE_NO_FIX; // GPS fix type - uses Mavlink's GPS_FIX_TYPE enum
+uint8_t mav_state = MAV_STATE_UNINIT;
 
 uint32_t last_fc_heartbeat_received = 0;    // Time that the last heartbeat message was received from the flight controller
 uint32_t last_bs_heartbeat_received = 0;    // Time that the last heartbeat message was received from the base station
@@ -36,7 +38,7 @@ uint32_t last_bs_heartbeat_sent = 0;        // Time that the last heartbeat mess
 
 // State machine states
 // I'm sure we'll need to add more of these
-enum state_t {DISARMED, BEGIN_ARM, WAIT_FOR_ARM, BEGIN_TAKEOFF, TAKING_OFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, BEGIN_RETURN_HOME, RETURNING_HOME, BEGIN_DISARM, WAIT_FOR_DISARM, DONE, ABORT} state;
+enum state_t {DISARMED, BEGIN_ARM, WAIT_FOR_ARM, BEGIN_TAKEOFF, WAIT_FOR_TAKEOFF_ACK, TAKING_OFF, BEGIN_APPROACH, APPROACHING, DROP, BEGIN_ESCAPE, ESCAPING, BEGIN_RETURN_HOME, RETURNING_HOME, WAIT_FOR_DISARM, BEGIN_DISARM, WAIT_FOR_DISARM_ACK, DONE, ABORT} state;
 
 packet_t packet_in; // Global packet to use for incoming data from the base station
 bool base_station_active = false; // Global to keep track of whether the base station is sending messages or not
@@ -74,8 +76,8 @@ void setup() {
   while(!flight_controller_ready) {
     if(receive_mavlink(&msg_in, &stat_in)) {          // Interpret any incoming data
       if(msg_in.msgid == MAVLINK_MSG_ID_HEARTBEAT) {  // Check the message ID of an received message
-        int hb_stat = mavlink_msg_heartbeat_get_system_status(&msg_in);
-        if(hb_stat == MAV_STATE_STANDBY) {
+        mav_state = mavlink_msg_heartbeat_get_system_status(&msg_in);
+        if(mav_state == MAV_STATE_STANDBY) {
           flight_controller_ready = true;
           last_fc_heartbeat_received = millis();
         }
@@ -225,6 +227,7 @@ void setup() {
           GPS_position_received = true;
           current_lat = mavlink_msg_global_position_int_get_lat(&msg_in);
           current_lon = mavlink_msg_global_position_int_get_lon(&msg_in);
+          current_relative_alt = mavlink_msg_global_position_int_get_relative_alt(&msg_in);
           break;
         case MAVLINK_MSG_ID_HOME_POSITION:
           home_location_updated = true;
@@ -296,15 +299,15 @@ void loop() {
     case BEGIN_TAKEOFF:
       send_msg_status("Taking off");
       takeoff();  // Initiate takeoff
-      state = TAKING_OFF;
+      state = WAIT_FOR_TAKEOFF_ACK;
       break;
-    case TAKING_OFF:       // Actively taking off
+    case WAIT_FOR_TAKEOFF_ACK:      // Actively taking off
       // listen for ACK response, and wait until complete
       if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_NAV_TAKEOFF) {
         send_msg_status("Takeoff command accepted");
         // takeoff complete, move on to mine approach
         command_status = COMPLETED; // Mark it as taken care of
-        state = BEGIN_APPROACH;
+        state = TAKING_OFF;
       }
       else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_NAV_TAKEOFF) {
         send_msg_status("Takeoff command rejected");
@@ -314,6 +317,15 @@ void loop() {
         state = DISARMED;
       }
       break;
+    case TAKING_OFF:
+      {
+      double alt_ratio = double(current_relative_alt)/OPERATING_ALT;
+      if(alt_ratio >= 0.95 && alt_ratio <= 1.05) {    // if we're within 5% of the target altitude...
+        send_msg_status("Target altitude reached");
+        state = BEGIN_APPROACH;
+      }
+      break;
+      }
     case BEGIN_APPROACH:      // Approaching a mine
       send_msg_status("Beginning approach");
       target_lat = mines[mines_index].lat;
@@ -356,31 +368,40 @@ void loop() {
     case RETURNING_HOME:      // Drone is in the process of flying back to the launch point
       if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_NAV_RETURN_TO_LAUNCH) {
         command_status = COMPLETED;
-        state = BEGIN_DISARM;
+        state = WAIT_FOR_DISARM;
       }
       break;
-    case BEGIN_DISARM:        // Sends the disarm command
-      send_msg_status("Disarming");
-      disarm();
-      state = WAIT_FOR_DISARM;
-      break;
-    case WAIT_FOR_DISARM:     // Waits for an acknowledgement of the disarm command
-      if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
-        send_msg_status("Disarm command accepted");
-        
+    case WAIT_FOR_DISARM:
+      if(mav_state == MAV_STATE_STANDBY) {
+        in_flight = false;
         if(mines_index == num_mines)
           state = DONE;
         else
           state = DISARMED;
-        
-        in_flight = false;
-        command_status = COMPLETED;
-      }
-      else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
-        send_msg_status("Disarm command rejected");
-        command_status = COMPLETED;
       }
       break;
+//    case BEGIN_DISARM:        // Sends the disarm command
+//      send_msg_status("Disarming");
+//      disarm();
+//      state = WAIT_FOR_DISARM;
+//      break;
+//    case WAIT_FOR_DISARM_ACK:     // Waits for an acknowledgement of the disarm command
+//      if(command_status == ACCEPTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
+//        send_msg_status("Disarm command accepted");
+//        
+//        if(mines_index == num_mines)
+//          state = DONE;
+//        else
+//          state = DISARMED;
+//        
+//        in_flight = false;
+//        command_status = COMPLETED;
+//      }
+//      else if(command_status == REJECTED && cmd_last_ack == MAV_CMD_COMPONENT_ARM_DISARM) {
+//        send_msg_status("Disarm command rejected");
+//        command_status = COMPLETED;
+//      }
+//      break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
       send_msg_status("ABORTING MISSION");
       state = BEGIN_RETURN_HOME;  // Send it home.
@@ -410,10 +431,12 @@ void loop() {
         break;
       case MAVLINK_MSG_ID_HEARTBEAT:
         last_fc_heartbeat_received = millis();
+        mav_state = mavlink_msg_heartbeat_get_system_status(&msg_in);
         break;
       case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
         current_lat = mavlink_msg_global_position_int_get_lat(&msg_in);
         current_lon = mavlink_msg_global_position_int_get_lon(&msg_in);
+        current_relative_alt = mavlink_msg_global_position_int_get_relative_alt(&msg_in);
         break;
       case MAVLINK_MSG_ID_STATUSTEXT:
         char status_text[128];
