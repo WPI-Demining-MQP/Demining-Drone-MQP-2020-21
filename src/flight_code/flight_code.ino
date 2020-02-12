@@ -322,7 +322,8 @@ void loop() {
       double alt_ratio = double(current_relative_alt)/OPERATING_ALT;
       if(alt_ratio >= 0.95 && alt_ratio <= 1.05) {    // if we're within 5% of the target altitude...
         send_msg_status("Target altitude reached");
-        state = BEGIN_APPROACH;
+//        state = BEGIN_APPROACH;
+        state = BEGIN_RETURN_HOME;
       }
       break;
       }
@@ -361,7 +362,6 @@ void loop() {
       }
       break;
     case BEGIN_RETURN_HOME:   // Tells the Pixhawk to fly back to the launch point
-      system_state = SYS_STATE_EMERGENCY;
       return_to_launch();
       state = RETURNING_HOME;
       break;
@@ -404,6 +404,7 @@ void loop() {
 //      break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
       send_msg_status("ABORTING MISSION");
+      system_state = SYS_STATE_EMERGENCY;
       state = BEGIN_RETURN_HOME;  // Send it home.
       break;
     case DONE:          // Mission completed, state will remain here
