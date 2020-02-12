@@ -21,5 +21,5 @@ All code is designed to run on a Teensy 3.5.  The Teensyduino add-on for the Ard
 In order to compile, you must copy the "mavlink" folder into Arduino's libraries directory.  On Windows, this is generally "Documents\Arduino\libraries".
 
 ## Other Repositories Needed:
-Base Station Code: https://github.com/edfoltan/MQP_DAS/
+Base Station Code: https://github.com/edfoltan/MQP_DAS/  
 Rover Code: https://github.com/16jcmckenna/Demining-Rover-MQP-2019-20
