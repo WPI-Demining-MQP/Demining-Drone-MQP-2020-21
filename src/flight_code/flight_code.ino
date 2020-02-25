@@ -15,7 +15,7 @@
 #define MAV_PORT   Serial1  // MAVLink port
 #define COMMS_PORT Serial2  // Base station comms port
 #define DEBUG_BAUD 115200
-#define MAV_BAUD   19200
+#define MAV_BAUD   115200
 #define COMMS_BAUD 57600
 
 #define OK_FIX_TYPE GPS_FIX_TYPE_DGPS  // Acceptable GPS fix type
@@ -319,11 +319,11 @@ void loop() {
       break;
     case TAKING_OFF:
       {
-      double alt_ratio = double(current_relative_alt)/OPERATING_ALT;
-      if(alt_ratio >= 0.95 && alt_ratio <= 1.05) {    // if we're within 5% of the target altitude...
+      double alt_ratio = (double(current_relative_alt)/1000.0)/OPERATING_ALT;
+      if(alt_ratio >= 0.9 && alt_ratio <= 1.1) {    // if we're within 5% of the target altitude...
         send_msg_status("Target altitude reached");
-//        state = BEGIN_APPROACH;
-        state = BEGIN_RETURN_HOME;
+        state = BEGIN_APPROACH;
+//        state = BEGIN_RETURN_HOME;
       }
       break;
       }
