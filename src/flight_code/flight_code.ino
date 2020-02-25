@@ -15,7 +15,7 @@
 #define MAV_PORT   Serial1  // MAVLink port
 #define COMMS_PORT Serial2  // Base station comms port
 #define DEBUG_BAUD 115200
-#define MAV_BAUD   19200
+#define MAV_BAUD   115200
 #define COMMS_BAUD 57600
 
 #define OK_FIX_TYPE GPS_FIX_TYPE_DGPS  // Acceptable GPS fix type
@@ -243,8 +243,8 @@ void setup() {
           char param_id[17];
           mavlink_msg_param_value_get_param_id(&msg_in, param_id);
           break;
-        case MAVLINK_MSG_ID_GPS_RAW_INT:
-          fix_status = mavlink_msg_gps_raw_int_get_fix_type(&msg_in);
+        case MAVLINK_MSG_ID_GPS2_RAW:
+          fix_status = mavlink_msg_gps2_raw_get_fix_type(&msg_in);
           fix_stream_active = true;
           break;
       }
@@ -319,10 +319,11 @@ void loop() {
       break;
     case TAKING_OFF:
       {
-      double alt_ratio = double(current_relative_alt)/OPERATING_ALT;
-      if(alt_ratio >= 0.95 && alt_ratio <= 1.05) {    // if we're within 5% of the target altitude...
+      double alt_ratio = (double(current_relative_alt)/1000.0)/OPERATING_ALT;
+      if(alt_ratio >= 0.9 && alt_ratio <= 1.1) {    // if we're within 5% of the target altitude...
         send_msg_status("Target altitude reached");
         state = BEGIN_APPROACH;
+//        state = BEGIN_RETURN_HOME;
       }
       break;
       }
@@ -361,7 +362,6 @@ void loop() {
       }
       break;
     case BEGIN_RETURN_HOME:   // Tells the Pixhawk to fly back to the launch point
-      system_state = SYS_STATE_EMERGENCY;
       return_to_launch();
       state = RETURNING_HOME;
       break;
@@ -404,6 +404,7 @@ void loop() {
 //      break;
     case ABORT:         // User clicks the abort button and the drone needs to return to base
       send_msg_status("ABORTING MISSION");
+      system_state = SYS_STATE_EMERGENCY;
       state = BEGIN_RETURN_HOME;  // Send it home.
       break;
     case DONE:          // Mission completed, state will remain here

@@ -34,7 +34,7 @@ enum message_types { MSG_HEARTBEAT=0,   // Heartbeat - sent to and received from
                      MSG_ACK=6,         // Acknowledgement packet - Confirms to the base station that a specific message type was received
                      MSG_HOME=7         // Home location - Passes the home location of the drone back to the base station for path planning
 };
-#define INVALID_MSG_TYPE_CUTOFF 7       // Any message type >= 7 is considered invalid
+#define INVALID_MSG_TYPE_CUTOFF 8       // Any message type >= 7 is considered invalid
 
 enum system_state_t { SYS_STATE_UNINIT, // System uninitialized/state is unknown
                       SYS_STATE_SETUP,  // System is initializing
