@@ -154,14 +154,14 @@ void initiate_GPS_data(bool resend) {
 }
 
 // Sends a message to the flight controller telling it to send the raw GPS data every 1 second
-void initiate_GPS_fix_data(bool resend = false) {
+void initiate_GPS_fix_data(bool resend) {
   mavlink_message_t msg;
   static uint8_t confirmation = 0;
   if(resend == true)
     confirmation++;
   else
     confirmation = 0;
-  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_SET_MESSAGE_INTERVAL, confirmation, MAVLINK_MSG_ID_GPS_RAW_INT, 1000000,0,0,0,0,0);  // request GLOBAL_POSITION_INT at 1 Hz
+  mavlink_msg_command_long_pack(SYS_ID, COMP_ID, &msg, TARGET_SYS, TARGET_COMP, MAV_CMD_SET_MESSAGE_INTERVAL, confirmation, MAVLINK_MSG_ID_GPS2_RAW, 1000000,0,0,0,0,0);  // request GLOBAL_POSITION_INT at 1 Hz
   send_mavlink(&msg);
   cmd_last_sent_time = millis();
   cmd_last_sent_type = MAV_CMD_SET_MESSAGE_INTERVAL;

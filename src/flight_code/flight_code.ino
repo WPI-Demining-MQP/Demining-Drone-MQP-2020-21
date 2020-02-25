@@ -243,8 +243,8 @@ void setup() {
           char param_id[17];
           mavlink_msg_param_value_get_param_id(&msg_in, param_id);
           break;
-        case MAVLINK_MSG_ID_GPS_RAW_INT:
-          fix_status = mavlink_msg_gps_raw_int_get_fix_type(&msg_in);
+        case MAVLINK_MSG_ID_GPS2_RAW:
+          fix_status = mavlink_msg_gps2_raw_get_fix_type(&msg_in);
           fix_stream_active = true;
           break;
       }
