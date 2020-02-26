@@ -320,7 +320,7 @@ void loop() {
     case TAKING_OFF:
       {
       double alt_ratio = (double(current_relative_alt)/1000.0)/OPERATING_ALT;
-      if(alt_ratio >= 0.9 && alt_ratio <= 1.1) {    // if we're within 5% of the target altitude...
+      if(alt_ratio >= 0.9 && alt_ratio <= 1.1) {    // if we're within 10% of the target altitude...
         send_msg_status("Target altitude reached");
         state = BEGIN_APPROACH;
 //        state = BEGIN_RETURN_HOME;
@@ -347,18 +347,19 @@ void loop() {
       state = BEGIN_ESCAPE;
       break;
     case BEGIN_ESCAPE:  // Drone just dropped a payload, should now be running away
-      if(mines_index % MINES_PER_RUN == 0 || mines_index >= num_mines) {
-        state = BEGIN_RETURN_HOME;
-      }
-      else {
-        set_position_target(mines[mines_index-1].escape_lat, mines[mines_index-1].escape_lon);  // Send the drone to the escape point
-        state = ESCAPING;
-      }
+      set_position_target(mines[mines_index-1].escape_lat, mines[mines_index-1].escape_lon);  // Send the drone to the escape point
+      state = ESCAPING;
       break;
     case ESCAPING:
-      // Remain in this case until the drone is acceptable close to the target point
+      // Remain in this state until the drone is acceptable close to the target point
       if(dist_to(current_lat, current_lon, target_lat, target_lon) < ESCAPE_TARGET_ERROR_MARGIN) {
-        state = BEGIN_APPROACH;
+        // If we need to land, do so. Otherwise, go to the next mine
+        if(mines_index % MINES_PER_RUN == 0 || mines_index >= num_mines) {
+          state = BEGIN_RETURN_HOME;
+        }
+        else {
+          state = BEGIN_APPROACH;
+        }
       }
       break;
     case BEGIN_RETURN_HOME:   // Tells the Pixhawk to fly back to the launch point
