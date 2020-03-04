@@ -21,7 +21,7 @@
 #define OK_FIX_TYPE GPS_FIX_TYPE_DGPS  // Acceptable GPS fix type
 #define UNRESPONSIVE_SYSTEM_TIMEOUT 5000  // Maximum allowable time (in ms) without getting a heartbeat (flight controller or base station) before we raise red flags
 
-#define DROP_TARGET_ERROR_MARGIN 0.05     // Minimum acceptable error (in meters) from the target point when the drone is about to drop a payload
+#define DROP_TARGET_ERROR_MARGIN 0.03     // Minimum acceptable error (in meters) from the target point when the drone is about to drop a payload
 #define ESCAPE_TARGET_ERROR_MARGIN 0.5    // Minimum acceptable error (in meters) from the target point when the drone is escaping
 
 // Default home latitude and longitude - these need to be updated by asking the Pixhawk for its home location
@@ -322,8 +322,8 @@ void loop() {
       double alt_ratio = (double(current_relative_alt)/1000.0)/OPERATING_ALT;
       if(alt_ratio >= 0.9 && alt_ratio <= 1.1) {    // if we're within 10% of the target altitude...
         send_msg_status("Target altitude reached");
-        state = BEGIN_APPROACH;
-//        state = BEGIN_RETURN_HOME;
+//        state = BEGIN_APPROACH;
+        state = BEGIN_RETURN_HOME;
       }
       break;
       }
@@ -347,12 +347,14 @@ void loop() {
       state = BEGIN_ESCAPE;
       break;
     case BEGIN_ESCAPE:  // Drone just dropped a payload, should now be running away
+      send_msg_status("Escaping");
       set_position_target(mines[mines_index-1].escape_lat, mines[mines_index-1].escape_lon);  // Send the drone to the escape point
       state = ESCAPING;
       break;
     case ESCAPING:
       // Remain in this state until the drone is acceptable close to the target point
       if(dist_to(current_lat, current_lon, target_lat, target_lon) < ESCAPE_TARGET_ERROR_MARGIN) {
+        send_msg_status("Reached escape point");
         // If we need to land, do so. Otherwise, go to the next mine
         if(mines_index % MINES_PER_RUN == 0 || mines_index >= num_mines) {
           state = BEGIN_RETURN_HOME;
@@ -363,6 +365,7 @@ void loop() {
       }
       break;
     case BEGIN_RETURN_HOME:   // Tells the Pixhawk to fly back to the launch point
+      send_msg_status("Returning home");
       return_to_launch();
       state = RETURNING_HOME;
       break;
@@ -374,6 +377,7 @@ void loop() {
       break;
     case WAIT_FOR_DISARM:
       if(mav_state == MAV_STATE_STANDBY) {
+        send_msg_status("Landing complete");
         in_flight = false;
         if(mines_index == num_mines)
           state = DONE;
